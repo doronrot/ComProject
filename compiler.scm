@@ -224,9 +224,8 @@
 			   	(string-append
 			   		(code-gen value major)
 			   		"MOV (R1, FPARG(0));\n" ;env
-			   		"MOV (R1, INDD(R1,"major_str"));\n"		;plus 1?	   		
+			   		"MOV (R1, INDD(R1,"major_str"));\n"	   		
 			   		"MOV (INDD(R1,"minor_str"), R0);\n")))
-			   		)))
 			  (else ""))))
 
 (define compile-scheme-file
