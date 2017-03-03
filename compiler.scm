@@ -179,6 +179,7 @@
 					"RETURN;\n"		;return to caller
 					"L_clos_exit_"count_str":\n"
 					)))
+			  ;bvar
 			  ((and (pair? pe) 
 			  		(equal? (car pe) 'bvar))
 			   (let* ((major (caddr pe))
@@ -189,12 +190,42 @@
 			   		"MOV (R0, FPARG(0));\n" ;env
 			   		"MOV (R0, INDD(R0,"major_str"));\n"		;plus 1?	   		
 			   		"MOV (R0, INDD(R0,"minor_str"));\n")))
+			  ;pvar
 			  ((and (pair? pe) 
 			  	    (equal? (car pe) 'pvar))
 			   (let* ((minor (caddr pe)) 
 			   		  (minor_str (number->string minor)))
 			   	(string-append
 			   		"MOV (R0, FPARG(2+"minor_str"));\n" ;the minor's argument
+			   		)))
+			  ;set pvar
+			  ((and (pair? pe) 
+			  	    (equal? (car pe) 'set)
+			  	    (equal? (caadr pe) 'pvar))
+			   (let* ((complete_var (cadr pe))
+			   		  (minor (caddr complete_var))
+			   		  (value (caddr pe)) 
+			   		  (minor_str (number->string minor)))
+			   	(string-append
+			   		(code-gen value major)
+			   		"MOV (FPARG(2+"minor_str"), R0);\n"
+			   		"MOV (R0, IMM(T_VOID));\n" ;IMPORTANT TODO!! - AFTER CONST TABLE CHANGE TO SOB_VOID
+			   		)))
+			  ;set bvar
+			  ((and (pair? pe) 
+			  	    (equal? (car pe) 'set)
+			  	    (equal? (caadr pe) 'bvar))
+			   (let* ((complete_var (cadr pe))
+			   		  (minor (cadddr complete_var))
+			   		  (major (caddr complete_var))
+			   		  (value (caddr pe)) 
+			   		  (minor_str (number->string minor))
+			   		  (major_str (number->string major)))
+			   	(string-append
+			   		(code-gen value major)
+			   		"MOV (R1, FPARG(0));\n" ;env
+			   		"MOV (R1, INDD(R1,"major_str"));\n"		;plus 1?	   		
+			   		"MOV (INDD(R1,"minor_str"), R0);\n")))
 			   		)))
 			  (else ""))))
 
@@ -209,8 +240,8 @@
 			   (asm_instructions_list (build_asm_insts_list super_parsed_list))
 			   (asm_instructions_string (build_asm_insts_string asm_instructions_list))
 			   (final_asm (add_prologue_epilgue asm_instructions_string)))
-			(string->file final_asm asm_target_file))))
-;super_parsed_list)))
+;			(string->file final_asm asm_target_file))))
+super_parsed_list)))
 
 ;TODO - ONLY ONE S-EXP
 (define build_asm_insts_list
