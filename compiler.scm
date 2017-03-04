@@ -8,7 +8,7 @@
 (define count 0)
 
 (define code-gen
-	(lambda (pe major)
+	(lambda (pe major const_tab)
 		(cond 
 			 ;void
 			  ((equal? pe `(const ,(void)))
@@ -50,13 +50,13 @@
 			  	 	   (dit (caddr pe))
 			  	 	   (dif (cadddr pe))
 			  	 	   (count_str (number->string count)))
-			  	 	(string-append (code-gen test major)
+			  	 	(string-append (code-gen test major const_tab)
 			  	 				    "CMP (R0, IMM(SOB_FALSE));\n"
 			  	 				    "JUMP_EQ (L_if3_else_"count_str");\n"
-			  	 				    (code-gen dit major)
+			  	 				    (code-gen dit major const_tab)
 			  	 				    "JUMP (L_if3_exit_"count_str");\n"
 			  	 				    "L_if3_else_"count_str":\n"
-			  	 				    (code-gen dif major)
+			  	 				    (code-gen dif major const_tab)
 			  	 				    "L_if3_exit_"count_str":\n")))
 			  ;seq
 			  ((and (pair? pe) 
@@ -65,7 +65,7 @@
 			   	 (letrec ((run (lambda (lst)
 			   	 					(if (null? lst)
 			   	 						""
-			   	 						(string-append (code-gen (car lst) major)
+			   	 						(string-append (code-gen (car lst) major const_tab)
 			   	 									   (run (cdr lst)))))))
 			   	 	(run seq_body))))
 			  	;or
@@ -76,9 +76,9 @@
 			  		  (count_str (number->string count)))
 			  		(letrec ((run (lambda (lst)
 			  						 (if (equal? (length lst) 1)
-			  						 	 (string-append (code-gen (car lst) major)
+			  						 	 (string-append (code-gen (car lst) major const_tab)
 			  						 	 				"L_or_exit_"count_str":\n")
-			  						 	 (string-append (code-gen (car lst) major)
+			  						 	 (string-append (code-gen (car lst) major const_tab)
 			  						 	 				"CMP(R0, IMM(SOB_FALSE));\n"
 			  						 	 				"JUMP_NE(L_or_exit_"count_str");\n"
 			  						 	 				(run (cdr lst)))))))
@@ -96,7 +96,7 @@
 			  						 (if (null? lst)
 			  						 	 (string-append 
 			  						 	   "PUSH ("args_count_str");\n"
-  						 				   (code-gen proc major)
+  						 				   (code-gen proc major const_tab)
   						 				   "CMP (INDD(R0, 0),IMM(T_CLOSURE));\n"
   						 				   "JUMP_NE (L_error_cannot_apply_non_clos_"count_str");\n"
   						 				   "PUSH (INDD(R0,1));\n"
@@ -109,7 +109,7 @@
   						 				   "L_error_cannot_apply_non_clos_"count_str":\n"
   						 				   "L_applic_exit_"count_str":\n")
 			  						 	 (string-append 
-			  						 	   (code-gen (car lst) major)
+			  						 	   (code-gen (car lst) major const_tab)
   						 				   "PUSH (R0);\n"
   						 				   (run (cdr lst)))))))
 			  			(run (reverse args)))))
@@ -186,7 +186,7 @@
 
 					"CMP (FPARG(1),IMM("num_params_str"));\n"
 					"JUMP_NE (L_error_lambda_args_count_"count_str");\n"
-					(code-gen body (+ major 1))
+					(code-gen body (+ major 1) const_tab)
 					"JUMP (L_clos_ok_"count_str");\n"
 					"L_error_lambda_args_count_"count_str":\n"
 					"L_clos_ok_"count_str":\n"
@@ -222,7 +222,7 @@
 			   		  (value (caddr pe)) 
 			   		  (minor_str (number->string minor)))
 			   	(string-append
-			   		(code-gen value major)
+			   		(code-gen value major const_tab)
 			   		"MOV (FPARG(2+"minor_str"), R0);\n"
 			   		"MOV (R0, IMM(T_VOID));\n" ;IMPORTANT TODO!! - AFTER CONST TABLE CHANGE TO SOB_VOID
 			   		)))
@@ -237,7 +237,7 @@
 			   		  (minor_str (number->string minor))
 			   		  (major_str (number->string major)))
 			   	(string-append
-			   		(code-gen value major)
+			   		(code-gen value major const_tab)
 			   		"MOV (R1, FPARG(0));\n" ;env
 			   		"MOV (R1, INDD(R1,"major_str"));\n"	   		
 			   		"MOV (INDD(R1,"minor_str"), R0);\n"
@@ -278,7 +278,7 @@
 			   		  (value (caddr pe)) 
 			   		  (minor_str (number->string minor)))
 			   	(string-append
-			   		(code-gen value major)
+			   		(code-gen value major const_tab)
 			   		"MOV (R1, FPARG(2+"minor_str"))"
 			   		"MOV (IND(R1), R0);\n"
 			   		"MOV (R0, IMM(T_VOID));\n" ;IMPORTANT TODO!! - AFTER CONST TABLE CHANGE TO SOB_VOID
@@ -294,16 +294,25 @@
 			   		  (minor_str (number->string minor))
 			   		  (major_str (number->string major)))
 			   	(string-append
-			   		(code-gen value major)
+			   		(code-gen value major const_tab)
 			   		"MOV (R1, FPARG(0));\n" ;env
 			   		"MOV (R1, INDD(R1,"major_str"));\n"	
 			   		"MOV (R2, INDD(R1,"minor_str"));\n"   		
 			   		"MOV (IND(R2), R0);\n"
 			   		"MOV (R0, IMM(T_VOID));\n" ;IMPORTANT TODO!! - AFTER CONST TABLE CHANGE TO SOB_VOID
 			   		)))
+			  ;const
+			  ((and (pair? pe)
+			  	    (equal? (car pe) 'const))
+			    (let* ((address (search_element (cadr pe) const_tab))
+			    	   (address_str (number->string address)))
+			    	(string-append
+			  			"MOV (R0, IMM("address_str"));\n")
+			  		))
 			  ;else
 			  (else "") 
 			  	)))
+
 
 (define compile-scheme-file
 	(lambda (scm_src_file asm_target_file)
@@ -313,20 +322,20 @@
 			   (super_parsed_list (parsed_and_hw3 sexprs_list))
 			   (constant_table (build_constant_table super_parsed_list))
 			   (global_var_table (build_global_var_table super_parsed_list))
-			   (asm_instructions_list (build_asm_insts_list super_parsed_list))
+			   (asm_instructions_list (build_asm_insts_list super_parsed_list constant_table))
 			   (asm_instructions_string (build_asm_insts_string asm_instructions_list))
 			   (asm_with_const_table (add_const_table constant_table asm_instructions_string))
 			   (final_asm (add_prologue_epilgue asm_with_const_table)))
-			(string->file final_asm asm_target_file))))
-;super_parsed_list)))
+		(string->file final_asm asm_target_file))))
+;asm_instructions_list)))
 
 ;TODO - ONLY ONE S-EXP
 (define build_asm_insts_list
-	(lambda (super_parsed_list)
+	(lambda (super_parsed_list const_tab)
 		(if (null? super_parsed_list)
 			(list)
-			(cons (add_r0_print (code-gen (car super_parsed_list) 0))
-				  (build_asm_insts_list (cdr super_parsed_list))))))
+			(cons (add_r0_print (code-gen (car super_parsed_list) 0 const_tab))
+				  (build_asm_insts_list (cdr super_parsed_list) const_tab)))))
 
 ;TODO - PROBABLY REMOVE
 (define add_r0_print
