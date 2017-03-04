@@ -19,7 +19,7 @@
 					; "POP(R0);\n"
 					))
 			  ;list
-			   ((equal? pe `(applic (fvar list) ()))
+			   ((equal? pe `(const ()))
 			   	 (string-append
 				    "MOV(R0, IMM(SOB_NIL));\n"
 	 				; "PUSH(R0);\n"
@@ -315,7 +315,8 @@
 			   (global_var_table (build_global_var_table super_parsed_list))
 			   (asm_instructions_list (build_asm_insts_list super_parsed_list))
 			   (asm_instructions_string (build_asm_insts_string asm_instructions_list))
-			   (final_asm (add_prologue_epilgue asm_instructions_string)))
+			   (asm_with_const_table (add_const_table constant_table asm_instructions_string))
+			   (final_asm (add_prologue_epilgue asm_with_const_table)))
 			(string->file final_asm asm_target_file))))
 ;super_parsed_list)))
 
@@ -338,6 +339,46 @@
 		(if (null? insts_list)
 			""
 			(string-append (car insts_list) (build_asm_insts_string (cdr insts_list))))))
+
+(define add_const_table 
+	(lambda (constant_table asm_instructions_string)
+		(string-append (build_asm_constant_table constant_table)
+						asm_instructions_string)))
+
+(define build_asm_constant_table
+	(lambda (constant_table)
+		(let* ((last_element (car (reverse constant_table)))
+			   (address (car last_element))
+			   (represent (caddr last_element))
+		       (represent_length (length represent))
+		       (malloc_need (+ address represent_length))
+		       (malloc_need_str (number->string malloc_need)))
+			(string-append 
+				"PUSH ("malloc_need_str");\n"
+				"CALL (MALLOC);\n"
+				"DROP (1);\n"
+				(letrec ((run (lambda (lst)
+									(if (null? lst)
+										""
+										(let* ((element (car lst))
+											   (address (car element))
+											   (rep_lst (caddr element)))
+											(string-append (build_string_for_element_memory address rep_lst)
+											               (run (cdr lst))))))))
+					(run constant_table))))))
+
+(define build_string_for_element_memory
+	(lambda (address rep_lst)
+		(letrec ((run (lambda (lst num)
+						(if (null? lst)
+							""
+							(let ((string_rep (if (symbol? (car lst))
+												  (symbol->string (car lst))
+												  (number->string (car lst)))))
+								(string-append
+									"MOV (IND("(number->string num)"), "string_rep");\n"
+									(run (cdr lst) (+ num 1))))))))
+			(run rep_lst address))))
 
 
 ; /* change to 0 for no debug info to be printed: */
@@ -376,19 +417,10 @@ CONTINUE:
 PUSH(FP);
 MOV(FP, SP);
 
-PUSH(IMM(6));
-CALL(MALLOC);
-DROP(1);
-MOV(INDD(R0,0), IMM(T_VOID));
-#define SOB_VOID (IND(1))
-MOV(INDD(R0,1), IMM(T_NIL));
-#define SOB_NIL (IND(2))
-MOV(INDD(R0,2), IMM(T_BOOL));
-MOV(INDD(R0,3), IMM(0));
-#define SOB_FALSE (IND(3))
-MOV(INDD(R0,4), IMM(T_BOOL));
-MOV(INDD(R0,5), IMM(1));
-#define SOB_TRUE (IND(5))
+ #define SOB_VOID (IND(1))
+ #define SOB_NIL (IND(2))
+ #define SOB_FALSE (IND(3))
+ #define SOB_TRUE (IND(5))
 
 "
  asm_insts_string
@@ -406,10 +438,114 @@ return 0;
 
 
 
-;TODO
+;TODO - now
 (define build_constant_table
 	(lambda (super_parsed_list)
-		(list)))
+		(remove-dups (build_const_table_for_each_sexpr super_parsed_list))))
+
+(define remove-dups
+	(lambda (lst)
+		(if (null? lst)
+			lst
+			(if (member (car lst) (cdr lst))
+				(remove-dups (cdr lst))
+				(cons (car lst) (remove-dups (cdr lst)))))))
+
+(define build_const_table_for_each_sexpr
+	(lambda (super_parsed_list)
+		(if (null? super_parsed_list)
+			(list)
+			(append (build_const_table_for_sexpr (car super_parsed_list))
+					(build_const_table_for_each_sexpr (cdr super_parsed_list))))))
+
+(define build_const_table_for_sexpr
+	(lambda (super_parsed_sexpr)
+		(let* ((full_const_list (create_const_list super_parsed_sexpr))
+			   (const_list_no_dups (remove-dups full_const_list))
+			   (full_sub_const_list (create_sub_const_list const_list_no_dups))
+			   (sub_const_list_no_dups (remove-dups full_sub_const_list))
+			   (final_list (build_final_list sub_const_list_no_dups)))
+		 	final_list)))
+
+(define create_const_list
+	(lambda (sp_sexpr)
+		(cond ((or (null? sp_sexpr) (atom? sp_sexpr)) (list))
+			  ((and (equal? (car sp_sexpr) 'const)
+			  		(not (or 	(equal? sp_sexpr `(const ,(void)))
+								(equal? sp_sexpr `(const ()))
+								(equal? sp_sexpr `(const #f))
+								(equal? sp_sexpr `(const #t))))) 
+			   (cdr sp_sexpr))
+			  (else (append (create_const_list (car sp_sexpr))
+			  				(create_const_list (cdr sp_sexpr)))))))
+
+(define create_sub_const_list
+	(lambda (const_list)
+		(letrec ((run (lambda (element)
+						(cond ((pair? element)
+								`(,@(run (car element)) ,@(run (cdr element)) ,element))
+							  ((vector? element)
+							  	`(,@(apply append (map foo (vector->list element)))
+							  	  ,element))
+							  (else `(,element))))))
+			(remove_nil (flatten (map run const_list))))))
+
+(define flatten
+	(lambda (lst)
+   		(cond ((null? lst) lst)
+         	  ((list? (car lst)) `(,@(car lst) ,@(flatten (cdr lst))))
+         	  (else (cons (car lst) (flatten (cdr lst)))))))
+
+(define remove_nil
+	(lambda (lst)
+		(if (null? lst)
+			lst
+			(if (equal? (car lst) '())
+				(remove_nil (cdr lst))
+				(cons (car lst) (remove_nil (cdr lst)))))))
+
+
+(define build_final_list
+	(lambda (sub_const_list_no_dups)
+		(let* ((firsts (build_firsts))
+			   (rests (build_rest sub_const_list_no_dups firsts 7)))
+			(cons `(1 ,(void) (T_VOID)) rests))))
+
+(define build_firsts
+	(lambda ()
+		(list 
+			  `(2 () (T_NIL))
+			  `(3 #t (T_BOOL 1))
+			  `(5 #f (T_BOOL 0)))))
+
+(define build_rest
+	(lambda (sub_list acc_list next_available)
+		(if (null? sub_list)
+			acc_list
+			(let* ((current_element (build_const_list_element (car sub_list) next_available acc_list))
+				  (element_length (length (caddr current_element))))
+				(build_rest (cdr sub_list)
+					        (append acc_list `(,current_element))
+					        (+ next_available element_length))))))
+
+(define build_const_list_element
+	(lambda (element next_available acc_list)
+		(cond ((number? element)
+			   `(,next_available ,element (T_INTEGER ,element)))
+			  ((pair? element)
+			   `(,next_available ,element (T_PAIR ,(search_element (car element) acc_list)
+			   									  ,(search_element (cdr element) acc_list))))
+			  (else '()))))
+
+(define search_element
+	(lambda (element lst)
+		(if (null? lst)
+			0
+			(let* ((current (car lst))
+				   (current_value (cadr current)))
+			 	(if (equal? current_value element)
+			 		(car current)
+			 		(search_element element (cdr lst)))))))
 
 ;TODO
 (define build_global_var_table
