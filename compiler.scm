@@ -14,30 +14,34 @@
 			  ((equal? pe `(const ,(void)))
 				(string-append
 					"MOV(R0, IMM(SOB_VOID));\n"
-					"PUSH(R0);\n"
-					"CALL(WRITE_SOB_VOID);\n"
-					"POP(R0);\n"))
+					; "PUSH(R0);\n"
+					; "CALL(WRITE_SOB_VOID);\n"
+					; "POP(R0);\n"
+					))
 			  ;list
 			   ((equal? pe `(applic (fvar list) ()))
 			   	 (string-append
 				    "MOV(R0, IMM(SOB_NIL));\n"
-	 				"PUSH(R0);\n"
-	 				"CALL(WRITE_SOB_NIL);\n"
-	 				"POP(R0);\n"))
+	 				; "PUSH(R0);\n"
+	 				; "CALL(WRITE_SOB_NIL);\n"
+	 				; "POP(R0);\n"
+	 				))
 			   ;#f
 			   ((equal? pe `(const #f))
 			   	 (string-append
 				    "MOV(R0, IMM(SOB_FALSE));\n"
-	 				"PUSH(R0);\n"
-	 				"CALL(WRITE_SOB_BOOL);\n"
-	 				"POP(R0);\n"))
+	 				; "PUSH(R0);\n"
+	 				; "CALL(WRITE_SOB_BOOL);\n"
+	 				; "POP(R0);\n"
+	 				))
 			   ;#t
 			   ((equal? pe `(const #t)) 
 			  	 (string-append
 				    "MOV(R0, IMM(SOB_TRUE));\n"
-	 				"PUSH(R0);\n"
-	 				"CALL(WRITE_SOB_BOOL);\n"
-	 				"POP(R0);\n"))
+	 				; "PUSH(R0);\n"
+	 				; "CALL(WRITE_SOB_BOOL);\n"
+	 				; "POP(R0);\n"
+	 				))
 			   ;if
 			  	((and (pair? pe) 
 			  	    (equal? (car pe) 'if3))
@@ -54,6 +58,16 @@
 			  	 				    "L_if3_else_"count_str":\n"
 			  	 				    (code-gen dif major)
 			  	 				    "L_if3_exit_"count_str":\n")))
+			  ;seq
+			  ((and (pair? pe) 
+			  	    (equal? (car pe) 'seq))
+			   (let ((seq_body (cadr pe)))
+			   	 (letrec ((run (lambda (lst)
+			   	 					(if (null? lst)
+			   	 						""
+			   	 						(string-append (code-gen (car lst) major)
+			   	 									   (run (cdr lst)))))))
+			   	 	(run seq_body))))
 			  	;or
 			  ((and (pair? pe)
 			  		(equal? (car pe) 'or))
@@ -112,7 +126,7 @@
 				  	   (major_str (number->string major)))
 			  	  (string-append 
 					"MOV (R1,FPARG(0));\n"	;env
-					"PUSH (IMM(1+"major_str"));\n" ;TODO- create lambdas counter "major"
+					"PUSH (IMM(1+"major_str"));\n"
 					"CALL(MALLOC);\n"
 					"DROP(1);\n"
 					"MOV (R2, R0);\n"
@@ -366,15 +380,15 @@ PUSH(IMM(6));
 CALL(MALLOC);
 DROP(1);
 MOV(INDD(R0,0), IMM(T_VOID));
-#define SOB_VOID (INDD(R0,0))
+#define SOB_VOID (IND(1))
 MOV(INDD(R0,1), IMM(T_NIL));
-#define SOB_NIL (INDD(R0,1))
+#define SOB_NIL (IND(2))
 MOV(INDD(R0,2), IMM(T_BOOL));
 MOV(INDD(R0,3), IMM(0));
-#define SOB_FALSE (INDD(R0,2))
+#define SOB_FALSE (IND(3))
 MOV(INDD(R0,4), IMM(T_BOOL));
 MOV(INDD(R0,5), IMM(1));
-#define SOB_TRUE (INDD(R0,4))
+#define SOB_TRUE (IND(5))
 
 "
  asm_insts_string
