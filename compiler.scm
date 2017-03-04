@@ -225,7 +225,9 @@
 			   		(code-gen value major)
 			   		"MOV (R1, FPARG(0));\n" ;env
 			   		"MOV (R1, INDD(R1,"major_str"));\n"	   		
-			   		"MOV (INDD(R1,"minor_str"), R0);\n")))
+			   		"MOV (INDD(R1,"minor_str"), R0);\n"
+			   		"MOV (R0, IMM(T_VOID));\n" ;IMPORTANT TODO!! - AFTER CONST TABLE CHANGE TO SOB_VOID
+			   		)))
 			  (else ""))))
 
 (define compile-scheme-file
@@ -239,8 +241,8 @@
 			   (asm_instructions_list (build_asm_insts_list super_parsed_list))
 			   (asm_instructions_string (build_asm_insts_string asm_instructions_list))
 			   (final_asm (add_prologue_epilgue asm_instructions_string)))
-;			(string->file final_asm asm_target_file))))
-super_parsed_list)))
+			(string->file final_asm asm_target_file))))
+;super_parsed_list)))
 
 ;TODO - ONLY ONE S-EXP
 (define build_asm_insts_list
