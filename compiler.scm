@@ -4,6 +4,7 @@
 ;starg (inlib/char&io/ in some files)
 ;addr(0) (in lib/system/malloc)
 
+
 (define count 0)
 
 (define code-gen
@@ -179,6 +180,14 @@
 					"RETURN;\n"		;return to caller
 					"L_clos_exit_"count_str":\n"
 					)))
+			  ;pvar
+			  ((and (pair? pe) 
+			  	    (equal? (car pe) 'pvar))
+			   (let* ((minor (caddr pe)) 
+			   		  (minor_str (number->string minor)))
+			   	(string-append
+			   		"MOV (R0, FPARG(2+"minor_str"));\n" ;the minor's argument
+			   		)))			  
 			  ;bvar
 			  ((and (pair? pe) 
 			  		(equal? (car pe) 'bvar))
@@ -188,16 +197,8 @@
 			   		  (minor_str (number->string minor)))
 			   	(string-append
 			   		"MOV (R0, FPARG(0));\n" ;env
-			   		"MOV (R0, INDD(R0,"major_str"));\n"		;plus 1?	   		
+			   		"MOV (R0, INDD(R0,"major_str"));\n"	   		
 			   		"MOV (R0, INDD(R0,"minor_str"));\n")))
-			  ;pvar
-			  ((and (pair? pe) 
-			  	    (equal? (car pe) 'pvar))
-			   (let* ((minor (caddr pe)) 
-			   		  (minor_str (number->string minor)))
-			   	(string-append
-			   		"MOV (R0, FPARG(2+"minor_str"));\n" ;the minor's argument
-			   		)))
 			  ;set pvar
 			  ((and (pair? pe) 
 			  	    (equal? (car pe) 'set)
@@ -228,7 +229,67 @@
 			   		"MOV (INDD(R1,"minor_str"), R0);\n"
 			   		"MOV (R0, IMM(T_VOID));\n" ;IMPORTANT TODO!! - AFTER CONST TABLE CHANGE TO SOB_VOID
 			   		)))
-			  (else ""))))
+			  ;box-get pvar ;TODO - CHECK!! AFTER HANDLE WITH SEQ
+			  ((and (pair? pe) 
+			  	    (equal? (car pe) 'box-get)
+			  	    (equal? (caadr pe) 'pvar))
+			   (let* ((complete_var (cadr pe))
+			   		  (minor (caddr complete_var))
+			   		  (minor_str (number->string minor)))
+			   	(string-append
+			   		"MOV (R0, FPARG(2+"minor_str"));\n"
+			   		"MOV (R0, IND(R0));\n"
+			   		)))
+			  ;box-get bvar ;TODO - CHECK!! AFTER HANDLE WITH SEQ
+			  ((and (pair? pe) 
+			  	    (equal? (car pe) 'box-get)
+			  	    (equal? (caadr pe) 'bvar))
+			   (let* ((complete_var (cadr pe))
+			   		  (minor (cadddr complete_var))
+			   		  (major (caddr complete_var))
+			   		  (minor_str (number->string minor))
+			   		  (major_str (number->string major)))
+			   	(string-append
+			   		"MOV (R0, FPARG(0));\n" ;env
+			   		"MOV (R0, INDD(R0,"major_str"));\n"	   		
+			   		"MOV (R0, INDD(R0,"minor_str"));\n"
+			   		"MOV (R0, IND(R0));\n"
+			   		)))
+			  ;box-set pvar ;TODO - CHECK!! AFTER HANDLE WITH SEQ
+			  ((and (pair? pe) 
+			  	    (equal? (car pe) 'box-set)
+			  	    (equal? (caadr pe) 'pvar))
+			   (let* ((complete_var (cadr pe))
+			   		  (minor (caddr complete_var))
+			   		  (value (caddr pe)) 
+			   		  (minor_str (number->string minor)))
+			   	(string-append
+			   		(code-gen value major)
+			   		"MOV (R1, FPARG(2+"minor_str"))"
+			   		"MOV (IND(R1), R0);\n"
+			   		"MOV (R0, IMM(T_VOID));\n" ;IMPORTANT TODO!! - AFTER CONST TABLE CHANGE TO SOB_VOID
+			   		)))
+			  ;box-set bvar ;TODO - CHECK!! AFTER HANDLE WITH SEQ
+			  ((and (pair? pe) 
+			  	    (equal? (car pe) 'box-set)
+			  	    (equal? (caadr pe) 'bvar))
+			   (let* ((complete_var (cadr pe))
+			   		  (minor (cadddr complete_var))
+			   		  (major (caddr complete_var))
+			   		  (value (caddr pe)) 
+			   		  (minor_str (number->string minor))
+			   		  (major_str (number->string major)))
+			   	(string-append
+			   		(code-gen value major)
+			   		"MOV (R1, FPARG(0));\n" ;env
+			   		"MOV (R1, INDD(R1,"major_str"));\n"	
+			   		"MOV (R2, INDD(R1,"minor_str"));\n"   		
+			   		"MOV (IND(R2), R0);\n"
+			   		"MOV (R0, IMM(T_VOID));\n" ;IMPORTANT TODO!! - AFTER CONST TABLE CHANGE TO SOB_VOID
+			   		)))
+			  ;else
+			  (else "") 
+			  	)))
 
 (define compile-scheme-file
 	(lambda (scm_src_file asm_target_file)
