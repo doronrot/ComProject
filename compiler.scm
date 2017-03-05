@@ -13,8 +13,8 @@
 			 ;void
 			  ((equal? pe `(const ,(void)))
 				(string-append
-					"CALL (MAKE_SOB_VOID);\n"
-					; "MOV(R0, IMM(SOB_VOID));\n"
+					; "CALL (MAKE_SOB_VOID);\n"
+					"MOV(R0, IMM(SOB_VOID));\n"
 					; "PUSH(R0);\n"
 					; "CALL(WRITE_SOB_VOID);\n"
 					; "POP(R0);\n"
@@ -22,7 +22,8 @@
 			  ;list
 			   ((equal? pe `(const ()))
 			   	 (string-append
-				    "CALL (MAKE_SOB_NIL);\n"
+				    ; "CALL (MAKE_SOB_NIL);\n"
+				    "MOV(R0, IMM(SOB_NIL));\n"
 	 				; "PUSH(R0);\n"
 	 				; "CALL(WRITE_SOB_NIL);\n"
 	 				; "POP(R0);\n"
@@ -30,9 +31,10 @@
 			   ;#f
 			   ((equal? pe `(const #f))
 			   	 (string-append
-			   	 	"PUSH (IMM(0));\n"
-				    "CALL (MAKE_SOB_BOOL);\n"
-				    "DROP (1);\n"
+			   	 ; 	"PUSH (IMM(0));\n"
+				    ; "CALL (MAKE_SOB_BOOL);\n"
+				    ; "DROP (1);\n"
+				    "MOV(R0, IMM(SOB_TRUE));\n"
 	 				; "PUSH(R0);\n"
 	 				; "CALL(WRITE_SOB_BOOL);\n"
 	 				; "POP(R0);\n"
@@ -40,9 +42,10 @@
 			   ;#t
 			   ((equal? pe `(const #t)) 
 			  	 (string-append
-			   	 	"PUSH (IMM(1));\n"
-				    "CALL (MAKE_SOB_BOOL);\n"
-				    "DROP (1);\n"
+			   	 ; 	"PUSH (IMM(1));\n"
+				    ; "CALL (MAKE_SOB_BOOL);\n"
+				    ; "DROP (1);\n"
+				    "MOV(R0, IMM(SOB_FALSE));\n"
 	 				; "PUSH(R0);\n"
 	 				; "CALL(WRITE_SOB_BOOL);\n"
 	 				; "POP(R0);\n"
@@ -487,6 +490,53 @@
 					"RETURN;\n"		;return to caller
 					"L_clos_exit_"count_str":\n"
 					)))
+			  ;tc-applic
+			  ((and (pair? pe) 
+			  		(equal? (car pe) 'tc-applic))
+			  	(set! count (+ count 1))
+			  	(let* ((proc (cadr pe))
+			  		   (args (caddr pe))
+			  		   (args_count (length args))
+			  		   (args_count_str (number->string args_count))
+			  		   (count_str (number->string count)))
+			  		(letrec ((run (lambda (lst counter_up) 
+			  						 (if (null? lst)
+			  						 	 (string-append 
+			  						 	   "PUSH ("args_count_str");\n"
+  						 				   (code-gen proc major const_tab)
+  						 				   "CMP (INDD(R0, 0),IMM(T_CLOSURE));\n"
+  						 				   "JUMP_NE (L_error_cannot_apply_non_clos_"count_str");\n"
+										   "MOV (R1, FPARG(-2));\n" ;old fp 1 - START FROM HERE
+										   "MOV (R2, FPARG(-1));\n" ;ret
+										   "PUSH (R2);\n"	
+										   "PUSH (R1);\n"
+  						 				   ; "PUSH (INDD(R0,1));\n" ;env
+  						 				   ; "PUSH (FPARG(-1));\n" ;old return address
+  						 				   ; "MOV (R1, FPARG(-2));\n"
+  						 				   ; ; ;new frame instead of new:
+  						 				   ; "MOV (R2, FPARG(1));\n" ;num of params
+  						 				   ; "MOV (R2, (R2+R1));\n" ;start of prev frame
+  						 				   "MOV (R3, 0);\n"
+  						 				   "L_tc_applic_loop_"count_str":\n"
+  						 				   "CMP (R3, IMM("(number->string counter_up)"));\n"
+  						 				   "JUMP_EQ (L_tc_applic_loop_exit_"count_str");\n"
+  						 				   "MOV (STACK(R1), LOCAL(R3));\n"
+  						 				   "ADD (R3, IMM(1));\n"
+										   "ADD (R1, IMM(1));\n"
+  						 				   "JUMP (L_tc_applic_loop_"count_str");\n"
+  						 				   "L_tc_applic_loop_exit_"count_str":\n"
+  						 				   "DROP ("(+ 2 (number->string counter_up))");\n"
+  						 				   ; ;done
+  						 				   "MOV (FP, R1);\n"
+  						 				   "JUMPA (INDD(R0,2));\n"
+  						 				   "L_error_cannot_apply_non_clos_"count_str":\n"
+  						 				   "")
+
+			  						 	 (string-append 
+			  						 	   (code-gen (car lst) major const_tab)
+  						 				   "PUSH (R0);\n"
+  						 				   (run (cdr lst) (+ counter_up 1)))))))
+			  		(run (reverse args) 4))))
 
 			  ;else
 			  (else "") 
@@ -505,8 +555,8 @@
 			   (asm_instructions_string (build_asm_insts_string asm_instructions_list))
 			   (asm_with_const_table (add_const_table constant_table asm_instructions_string))
 			   (final_asm (add_prologue_epilgue asm_with_const_table)))
-			(string->file final_asm asm_target_file))))
-;constant_table)))
+;			(string->file final_asm asm_target_file))))
+super_parsed_list)))
 
 ;TODO - ONLY ONE S-EXP
 (define build_asm_insts_list
