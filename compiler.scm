@@ -14,33 +14,33 @@
 			  ((equal? pe `(const ,(void)))
 				(string-append
 					"MOV(R0, IMM(SOB_VOID));\n"
-					"PUSH(R0);\n"
-					"CALL(WRITE_SOB_VOID);\n"
-					"POP(R0);\n"
+					; "PUSH(R0);\n"
+					; "CALL(WRITE_SOB_VOID);\n"
+					; "POP(R0);\n"
 					))
 			  ;list
 			   ((equal? pe `(const ()))
 			   	 (string-append
 				    "MOV(R0, IMM(SOB_NIL));\n"
-	 				"PUSH(R0);\n"
-	 				"CALL(WRITE_SOB_NIL);\n"
-	 				"POP(R0);\n"
+	 				; "PUSH(R0);\n"
+	 				; "CALL(WRITE_SOB_NIL);\n"
+	 				; "POP(R0);\n"
 	 				))
 			   ;#f
 			   ((equal? pe `(const #f))
 			   	 (string-append
 				    "MOV(R0, IMM(SOB_FALSE));\n"
-	 				"PUSH(R0);\n"
-	 				"CALL(WRITE_SOB_BOOL);\n"
-	 				"POP(R0);\n"
+	 				; "PUSH(R0);\n"
+	 				; "CALL(WRITE_SOB_BOOL);\n"
+	 				; "POP(R0);\n"
 	 				))
 			   ;#t
 			   ((equal? pe `(const #t)) 
 			  	 (string-append
 				    "MOV(R0, IMM(SOB_TRUE));\n"
-	 				"PUSH(R0);\n"
-	 				"CALL(WRITE_SOB_BOOL);\n"
-	 				"POP(R0);\n"
+	 				; "PUSH(R0);\n"
+	 				; "CALL(WRITE_SOB_BOOL);\n"
+	 				; "POP(R0);\n"
 	 				))
 			   ;if
 			  	((and (pair? pe) 
@@ -78,9 +78,10 @@
 			  						 (if (equal? (length lst) 1)
 			  						 	 (string-append (code-gen (car lst) major const_tab)
 			  						 	 				"L_or_exit_"count_str":\n"
-			  						 	 				"PUSH (R0);\n"
-			  						 	 				"CALL (WRITE_SOB);\n"
-			  						 	 				"DROP (1);\n")
+			  						 	 				; "PUSH (R0);\n"
+			  						 	 				; "CALL (WRITE_SOB);\n"
+			  						 	 				; "DROP (1);\n"
+			  						 	 				)
 			  						 	 (string-append (code-gen (car lst) major const_tab)
 			  						 	 				"CMP(R0, IMM(SOB_FALSE));\n"
 			  						 	 				"JUMP_NE(L_or_exit_"count_str");\n"
@@ -464,9 +465,9 @@
 		(letrec ((run (lambda (lst num)
 						(if (null? lst)
 							""
-							(let ((string_rep (if (symbol? (car lst))
-												  (symbol->string (car lst))
-												  (number->string (car lst)))))
+							(let ((string_rep (cond ((symbol? (car lst)) (symbol->string (car lst)))
+													((number? (car lst)) (number->string (car lst)))
+												  	((char? (car lst)) (number->string (char->integer (car lst)))))))
 								(string-append
 									"MOV (IND("(number->string num)"), "string_rep");\n"
 									(run (cdr lst) (+ num 1))))))))
@@ -509,18 +510,33 @@ CONTINUE:
 PUSH(FP);
 MOV(FP, SP);
 
- #define SOB_VOID (IND(1))
- #define SOB_NIL (IND(2))
- #define SOB_FALSE (IND(3))
- #define SOB_TRUE (IND(5))
+ #define SOB_VOID 1
+ #define SOB_NIL 2
+ #define SOB_FALSE 5
+ #define SOB_TRUE 3
+
+//PUSH(IMM(0x22));
+//CALL (PUTCHAR);
+//DROP(1);
 
 "
  asm_insts_string
 "
-//POP(FP);
-//PUSH(R0);
-//CALL (WRITE_SOB);
-//DROP(1);
+
+PUSH(R0);
+CALL(WRITE_SOB);
+DROP(1);
+/*
+; PUSH(IMM(0x5c));
+; CALL (PUTCHAR);
+; DROP(1);
+; PUSH(IMM('n'));
+; CALL (PUTCHAR);
+; DROP(1);
+; PUSH(IMM(0x22));
+; CALL (PUTCHAR);
+; DROP(1);
+*/
 
 /*TODO - remove info - for debug*/
 //INFO;
@@ -625,8 +641,16 @@ return 0;
 
 (define build_const_list_element
 	(lambda (element next_available acc_list)
-		(cond ((number? element)
+		(cond ((and (number? element) (integer? element))
 			   `(,next_available ,element (T_INTEGER ,element)))
+			  ((and (number? element) (not (integer? element)))
+			   `(,next_available ,element (T_FRACTION ,element))) ;todo: change
+			  ; ((string? element)
+			  ;  `(,next_available ,element (T_STRING ,(string-length element) )))
+			  ((char? element)
+			  	`(,next_available ,element (T_CHAR ,element)))
+			  ; ((symbol? element)
+			  ; 	`(,next_available ,element (T_SYMBOL ,element)))
 			  ((pair? element)
 			   `(,next_available ,element (T_PAIR ,(search_element (car element) acc_list)
 			   									  ,(search_element (cdr element) acc_list))))
