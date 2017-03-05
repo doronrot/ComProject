@@ -22,7 +22,7 @@
 			  ;list
 			   ((equal? pe `(const ()))
 			   	 (string-append
-				    "MOV(R0, IMM(SOB_NIL));\n"
+				    "CALL (MAKE_SOB_NIL);\n"
 	 				; "PUSH(R0);\n"
 	 				; "CALL(WRITE_SOB_NIL);\n"
 	 				; "POP(R0);\n"
@@ -30,7 +30,9 @@
 			   ;#f
 			   ((equal? pe `(const #f))
 			   	 (string-append
-				    "MOV(R0, IMM(SOB_FALSE));\n"
+			   	 	"PUSH (IMM(0));\n"
+				    "CALL (MAKE_SOB_BOOL);\n"
+				    "DROP (1);\n"
 	 				; "PUSH(R0);\n"
 	 				; "CALL(WRITE_SOB_BOOL);\n"
 	 				; "POP(R0);\n"
@@ -38,7 +40,9 @@
 			   ;#t
 			   ((equal? pe `(const #t)) 
 			  	 (string-append
-				    "MOV(R0, IMM(SOB_TRUE));\n"
+			   	 	"PUSH (IMM(1));\n"
+				    "CALL (MAKE_SOB_BOOL);\n"
+				    "DROP (1);\n"
 	 				; "PUSH(R0);\n"
 	 				; "CALL(WRITE_SOB_BOOL);\n"
 	 				; "POP(R0);\n"
@@ -393,6 +397,93 @@
 					"RETURN;\n"		;return to caller
 					"L_clos_exit_"count_str":\n"
 					)))
+			  ;lambda-var
+			  ((and (pair? pe) 
+			  		(equal? (car pe) 'lambda-var))
+			  	(set! count (+ count 1))
+			  	(let* (
+			  		   (optional_params 1)
+			  		   (optional_params_str (number->string optional_params))
+			  		   (body (caddr pe))
+			  		   (count_str (number->string count))
+				  	   (major_str (number->string major)))
+			  	  (string-append 
+					"MOV (R1,FPARG(0));\n"	;env
+					"PUSH (IMM(1+"major_str"));\n"
+					"CALL(MALLOC);\n"
+					"DROP(1);\n"
+					"MOV (R2, R0);\n"
+					(letrec ((shallow_copy 
+								(lambda (i j)
+								   (let ((i_str (number->string i))
+								   		 (j_str (number->string j)))
+									   (if (>= i major)
+									   	   ""
+									   	   (string-append 
+									   	   	  "MOV (R4, INDD(R1,"i_str"));\n"
+									   	   	  "MOV (INDD(R2,"j_str"), R4);\n"
+									   	   	  (shallow_copy (+ i 1) (+ j 1))))))))
+					   	(shallow_copy 0 1))
+					"MOV(R3,FPARG(1));\n"	;number of argumets
+					"PUSH(R3);\n"
+					"CALL(MALLOC);\n"
+					"DROP(1);\n"
+					"MOV (INDD(R2,0), R0);\n"
+
+					"MOV (R6, 0);\n" ;i
+					"MOV (R7, 2);\n" ;j
+					"L_clos_loop_"count_str":\n"
+					"CMP (R6, R3);\n"
+					"JUMP_GE (L_clos_loop_end_"count_str");\n"
+					"MOV (R4, (INDD(R2,0)));\n"
+					"MOV (R5, FPARG(R7));\n"
+					"MOV (INDD(R4, R6), R5);\n"
+					"ADD (R6, IMM(1));\n"
+					"ADD (R7, IMM(1));\n"
+					"JUMP (L_clos_loop_"count_str");\n"
+					"L_clos_loop_end_"count_str":\n"
+
+					"PUSH (IMM(3));\n"
+					"CALL(MALLOC);\n"
+					"DROP(1);\n"
+					"MOV (INDD(R0,0),IMM(T_CLOSURE));\n"
+					"MOV (INDD(R0,1),R2);\n"	;ext. env
+					
+					"MOV (INDD(R0,2),LABEL(L_clos_body_"count_str"));\n"
+					"JUMP (L_clos_exit_"count_str");\n"
+					
+					"L_clos_body_"count_str":\n"
+					"PUSH (FP);\n"
+					"MOV (FP,SP);\n"
+
+					;FIX STACK:
+					"MOV (R1, SOB_NIL);\n"
+					"ADD (R6, IMM(FPARG(1)));\n"
+					"L_clos_fix_stack_loop_"count_str":\n"
+					"CMP (R6, 0);\n"
+					"JUMP_LE (L_clos_fix_stack_out_"count_str");\n"
+					"PUSH (R1);\n"
+					"PUSH (FPARG(R6+1));\n"
+					"CALL (MAKE_SOB_PAIR);\n"
+					"DROP (2);\n"
+					"MOV (R1, R0);\n"
+					"SUB (R6, IMM(1));\n"
+					"JUMP (L_clos_fix_stack_loop_"count_str");\n"
+					"L_clos_fix_stack_out_"count_str":\n"
+
+					"MOV (FPARG(2),R1);\n"
+			  	  	"MOV (FPARG(1),"optional_params_str");\n"
+
+					"CMP (FPARG(1),IMM("optional_params_str"));\n"
+					"JUMP_NE (L_error_lambda_args_count_"count_str");\n"
+					(code-gen body (+ major 1) const_tab)
+					"JUMP (L_clos_ok_"count_str");\n"
+					"L_error_lambda_args_count_"count_str":\n"
+					"L_clos_ok_"count_str":\n"
+					"POP (FP);\n"
+					"RETURN;\n"		;return to caller
+					"L_clos_exit_"count_str":\n"
+					)))
 
 			  ;else
 			  (else "") 
@@ -412,7 +503,7 @@
 			   (asm_with_const_table (add_const_table constant_table asm_instructions_string))
 			   (final_asm (add_prologue_epilgue asm_with_const_table)))
 			(string->file final_asm asm_target_file))))
-;constant_table)))
+;super_parsed_list)))
 
 ;TODO - ONLY ONE S-EXP
 (define build_asm_insts_list
@@ -597,6 +688,8 @@ return 0;
 							  ((vector? element)
 							  	`(,@(apply append (map run (vector->list element)))
 							  	  ,element))
+							  ((or (equal? #t element) (equal? #f element))
+							  	'())
 							  (else `(,element))))))
 			(remove_nil (flatten (map run const_list))))))
 
@@ -621,6 +714,7 @@ return 0;
 			   (rests (build_rest sub_const_list_no_dups firsts 7)))
 			(cons `(1 ,(void) (T_VOID)) rests))))
 
+
 (define build_firsts
 	(lambda ()
 		(list 
@@ -634,9 +728,9 @@ return 0;
 			acc_list
 			(let* ((current_element (build_const_list_element (car sub_list) next_available acc_list))
 				  (element_length (length (caddr current_element))))
-				(build_rest (cdr sub_list)
-					        (append acc_list `(,current_element))
-					        (+ next_available element_length))))))
+				 (build_rest (cdr sub_list)
+				 	        (append acc_list `(,current_element))
+				 	        (+ next_available element_length))))))
 
 (define build_const_list_element
 	(lambda (element next_available acc_list)
