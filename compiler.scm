@@ -34,7 +34,7 @@
 			   	 ; 	"PUSH (IMM(0));\n"
 				    ; "CALL (MAKE_SOB_BOOL);\n"
 				    ; "DROP (1);\n"
-				    "MOV(R0, IMM(SOB_TRUE));\n"
+				    "MOV(R0, IMM(SOB_FALSE));\n"
 	 				; "PUSH(R0);\n"
 	 				; "CALL(WRITE_SOB_BOOL);\n"
 	 				; "POP(R0);\n"
@@ -45,7 +45,7 @@
 			   	 ; 	"PUSH (IMM(1));\n"
 				    ; "CALL (MAKE_SOB_BOOL);\n"
 				    ; "DROP (1);\n"
-				    "MOV(R0, IMM(SOB_FALSE));\n"
+				    "MOV(R0, IMM(SOB_TRUE));\n"
 	 				; "PUSH(R0);\n"
 	 				; "CALL(WRITE_SOB_BOOL);\n"
 	 				; "POP(R0);\n"
@@ -506,6 +506,7 @@
   						 				   (code-gen proc major const_tab)
   						 				   "CMP (INDD(R0, 0),IMM(T_CLOSURE));\n"
   						 				   "JUMP_NE (L_error_cannot_apply_non_clos_"count_str");\n"
+  						 				   "PUSH (INDD(R0,1));\n"
 										   "MOV (R1, FPARG(-2));\n" ;old fp 1 - START FROM HERE
 										   "MOV (R2, FPARG(-1));\n" ;ret
 										   "PUSH (R2);\n"	
@@ -518,14 +519,16 @@
   						 				   ; "MOV (R2, (R2+R1));\n" ;start of prev frame
   						 				   "MOV (R3, 0);\n"
   						 				   "L_tc_applic_loop_"count_str":\n"
-  						 				   "CMP (R3, IMM("(number->string counter_up)"));\n"
+  						 				   "CMP (R3, IMM("(number->string (+ 1 counter_up))"));\n"
   						 				   "JUMP_EQ (L_tc_applic_loop_exit_"count_str");\n"
-  						 				   "MOV (STACK(R1), LOCAL(R3));\n"
+  						 				   "MOV (STACK(R1+1), LOCAL(R3));\n"
   						 				   "ADD (R3, IMM(1));\n"
 										   "ADD (R1, IMM(1));\n"
   						 				   "JUMP (L_tc_applic_loop_"count_str");\n"
   						 				   "L_tc_applic_loop_exit_"count_str":\n"
-  						 				   "DROP ("(+ 2 (number->string counter_up))");\n"
+  						 				   "MOV(SP, FP);\n"
+  						 				   ; "DROP (3);"
+  						 				   "DROP ("(number->string(- counter_up 1))");\n"
   						 				   ; ;done
   						 				   "MOV (FP, R1);\n"
   						 				   "JUMPA (INDD(R0,2));\n"
@@ -536,7 +539,7 @@
 			  						 	   (code-gen (car lst) major const_tab)
   						 				   "PUSH (R0);\n"
   						 				   (run (cdr lst) (+ counter_up 1)))))))
-			  		(run (reverse args) 4))))
+			  		(run (reverse args) 3))))
 
 			  ;else
 			  (else "") 
@@ -555,8 +558,8 @@
 			   (asm_instructions_string (build_asm_insts_string asm_instructions_list))
 			   (asm_with_const_table (add_const_table constant_table asm_instructions_string))
 			   (final_asm (add_prologue_epilgue asm_with_const_table)))
-;			(string->file final_asm asm_target_file))))
-super_parsed_list)))
+			(string->file final_asm asm_target_file))))
+;super_parsed_list)))
 
 ;TODO - ONLY ONE S-EXP
 (define build_asm_insts_list
