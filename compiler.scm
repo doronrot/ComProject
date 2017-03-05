@@ -410,8 +410,8 @@
 			   (asm_instructions_string (build_asm_insts_string asm_instructions_list))
 			   (asm_with_const_table (add_const_table constant_table asm_instructions_string))
 			   (final_asm (add_prologue_epilgue asm_with_const_table)))
-		(string->file final_asm asm_target_file))))
-;super_parsed_list)))
+			(string->file final_asm asm_target_file))))
+;constant_table)))
 
 ;TODO - ONLY ONE S-EXP
 (define build_asm_insts_list
@@ -452,25 +452,29 @@
 				"DROP (1);\n"
 				(letrec ((run (lambda (lst)
 									(if (null? lst)
-										""
-										(let* ((element (car lst))
-											   (address (car element))
-											   (rep_lst (caddr element)))
-											(string-append (build_string_for_element_memory address rep_lst)
-											               (run (cdr lst))))))))
-					(run constant_table))))))
+										""	
+										 (let* ((element (car lst))
+										 	    (address (car element))
+										 	    (rep_lst (caddr element)))
+										 
+										 	(string-append (build_string_for_element_memory address rep_lst)
+										 	               (run (cdr lst))))))))
+					(run constant_table)))
+				
+			)))
 
 (define build_string_for_element_memory
 	(lambda (address rep_lst)
 		(letrec ((run (lambda (lst num)
 						(if (null? lst)
 							""
-							(let ((string_rep (cond ((symbol? (car lst)) (symbol->string (car lst)))
-													((number? (car lst)) (number->string (car lst)))
-												  	((char? (car lst)) (number->string (char->integer (car lst)))))))
-								(string-append
-									"MOV (IND("(number->string num)"), "string_rep");\n"
-									(run (cdr lst) (+ num 1))))))))
+							 (let ((string_rep (cond ((symbol? (car lst)) (symbol->string (car lst)))
+							 						 ((number? (car lst)) (number->string (car lst)))
+							 					  	 ((char? (car lst)) (number->string (char->integer (car lst))))
+							 					  	 (else ""))))
+							 	(string-append
+							 		"MOV (IND("(number->string num)"), "string_rep");\n"
+							 		(run (cdr lst) (+ num 1))))))))
 			(run rep_lst address))))
 
 
@@ -596,7 +600,7 @@ return 0;
 						(cond ((pair? element)
 								`(,@(run (car element)) ,@(run (cdr element)) ,element))
 							  ((vector? element)
-							  	`(,@(apply append (map foo (vector->list element)))
+							  	`(,@(apply append (map run (vector->list element)))
 							  	  ,element))
 							  (else `(,element))))))
 			(remove_nil (flatten (map run const_list))))))
@@ -645,10 +649,19 @@ return 0;
 			   `(,next_available ,element (T_INTEGER ,element)))
 			  ((and (number? element) (not (integer? element)))
 			   `(,next_available ,element (T_FRACTION ,element))) ;todo: change
-			  ; ((string? element)
-			  ;  `(,next_available ,element (T_STRING ,(string-length element) )))
 			  ((char? element)
 			  	`(,next_available ,element (T_CHAR ,element)))
+			  ((string? element)
+			  	(let ((list_of_chars (string->list element)))
+			   		`(,next_available ,element (T_STRING ,(string-length element) ,@list_of_chars))))
+			  ((vector? element)
+			  	(let ((list_of_address_vec (letrec ((run (lambda (lst)
+			  												(if (null? lst)
+			  													(list)
+			  													(cons (search_element (car lst) acc_list)
+			  														  (run (cdr lst)))))))
+			  									(run (vector->list element)))))
+			   `(,next_available ,element (T_VECTOR ,(vector-length element) ,@list_of_address_vec))))
 			  ; ((symbol? element)
 			  ; 	`(,next_available ,element (T_SYMBOL ,element)))
 			  ((pair? element)
