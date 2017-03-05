@@ -114,6 +114,7 @@
   						 				   "DROP (1);\n"
   						 				   "POP (R1);\n"
   						 				   "DROP(R1);\n"
+  						 				   "DROP (1);\n"
   						 				   "JUMP (L_applic_exit_"count_str");\n"
   						 				   "L_error_cannot_apply_non_clos_"count_str":\n"
   						 				   "L_applic_exit_"count_str":\n")
@@ -121,7 +122,9 @@
 			  						 	   (code-gen (car lst) major const_tab)
   						 				   "PUSH (R0);\n"
   						 				   (run (cdr lst)))))))
-			  			(run (reverse args)))))
+			  			(string-append	
+			  					"PUSH(SOB_NIL);\n"
+								(run (reverse args))))))
 			  ;lambda-simple
 			  ((and (pair? pe) 
 			  		(equal? (car pe) 'lambda-simple))
@@ -503,7 +506,7 @@
 			   (asm_with_const_table (add_const_table constant_table asm_instructions_string))
 			   (final_asm (add_prologue_epilgue asm_with_const_table)))
 			(string->file final_asm asm_target_file))))
-;super_parsed_list)))
+;constant_table)))
 
 ;TODO - ONLY ONE S-EXP
 (define build_asm_insts_list
