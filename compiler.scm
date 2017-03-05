@@ -13,7 +13,8 @@
 			 ;void
 			  ((equal? pe `(const ,(void)))
 				(string-append
-					"MOV(R0, IMM(SOB_VOID));\n"
+					"CALL (MAKE_SOB_VOID);\n"
+					; "MOV(R0, IMM(SOB_VOID));\n"
 					; "PUSH(R0);\n"
 					; "CALL(WRITE_SOB_VOID);\n"
 					; "POP(R0);\n"
@@ -217,7 +218,7 @@
 			   	(string-append
 			   		(code-gen value major const_tab)
 			   		"MOV (FPARG(2+"minor_str"), R0);\n"
-			   		"MOV (R0, IMM(T_VOID));\n" ;IMPORTANT TODO!! - AFTER CONST TABLE CHANGE TO SOB_VOID
+			   		"MOV (R0, SOB_VOID);\n" 
 			   		)))
 			  ;set bvar
 			  ((and (pair? pe) 
@@ -234,7 +235,7 @@
 			   		"MOV (R1, FPARG(0));\n" ;env
 			   		"MOV (R1, INDD(R1,"major_str"));\n"	   		
 			   		"MOV (INDD(R1,"minor_str"), R0);\n"
-			   		"MOV (R0, IMM(T_VOID));\n" ;IMPORTANT TODO!! - AFTER CONST TABLE CHANGE TO SOB_VOID
+			   		"MOV (R0, SOB_VOID);\n"
 			   		)))
 			  ;box-get pvar ;TODO - CHECK!! AFTER HANDLE WITH SEQ
 			  ((and (pair? pe) 
@@ -292,7 +293,7 @@
 			   		"MOV (R1, INDD(R1,"major_str"));\n"	
 			   		"MOV (R2, INDD(R1,"minor_str"));\n"   		
 			   		"MOV (IND(R2), R0);\n"
-			   		"MOV (R0, IMM(T_VOID));\n" ;IMPORTANT TODO!! - AFTER CONST TABLE CHANGE TO SOB_VOID
+			   		"MOV (R0, SOB_VOID);\n" ;IMPORTANT TODO!! - AFTER CONST TABLE CHANGE TO SOB_VOID
 			   		)))
 			  ;const
 			  ((and (pair? pe)
@@ -519,28 +520,21 @@ MOV(FP, SP);
  #define SOB_FALSE 5
  #define SOB_TRUE 3
 
-//PUSH(IMM(0x22));
-//CALL (PUTCHAR);
-//DROP(1);
-
 "
  asm_insts_string
 "
 
+CMP(R0, SOB_VOID);
+JUMP_EQ(DONT_PRINT);
+
 PUSH(R0);
 CALL(WRITE_SOB);
 DROP(1);
-/*
-; PUSH(IMM(0x5c));
-; CALL (PUTCHAR);
-; DROP(1);
-; PUSH(IMM('n'));
-; CALL (PUTCHAR);
-; DROP(1);
-; PUSH(IMM(0x22));
-; CALL (PUTCHAR);
-; DROP(1);
-*/
+OUT(2,10);
+
+DONT_PRINT:
+
+POP(FP);
 
 /*TODO - remove info - for debug*/
 //INFO;
@@ -553,18 +547,19 @@ return 0;
 
 
 
-;TODO - now
 (define build_constant_table
 	(lambda (super_parsed_list)
 		(remove-dups (build_const_table_for_each_sexpr super_parsed_list))))
 
 (define remove-dups
 	(lambda (lst)
-		(if (null? lst)
-			lst
-			(if (member (car lst) (cdr lst))
-				(remove-dups (cdr lst))
-				(cons (car lst) (remove-dups (cdr lst)))))))
+		(letrec ((run (lambda (reverse_lst) 
+							(if (null? reverse_lst)
+								reverse_lst
+								(if (member (car reverse_lst) (cdr reverse_lst))
+									(run (cdr reverse_lst))
+									(cons (car reverse_lst) (run (cdr reverse_lst))))))))
+			(reverse (run (reverse lst))))))
 
 (define build_const_table_for_each_sexpr
 	(lambda (super_parsed_list)
