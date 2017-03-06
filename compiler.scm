@@ -973,6 +973,7 @@ return 0;
                 ;                             (string-append (build_string_for_global_element_memory address rep)
                 ;                                            (run (cdr lst))))))))
                 ;     (run global_table))) 
+                )
             )))
 
 
