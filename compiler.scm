@@ -626,13 +626,20 @@
                (super_parsed_list (parsed_and_hw3 sexprs_list))
                (constant_table (build_constant_table super_parsed_list))
                (global_var_table (build_global_var_table super_parsed_list (find_next_available_address constant_table)))
+               (list_table_of_rep_string 
+                         (build_initial_table_list_string constant_table 
+                                                 (find_next_available_address_after_global global_var_table 
+                                                                                           constant_table)))
                (super_parsed_list_with_fvar_define (add_fvar_define super_parsed_list global_var_table))
                (asm_instructions_list (build_asm_insts_list super_parsed_list_with_fvar_define constant_table global_var_table))
                (asm_instructions_string (build_asm_insts_string asm_instructions_list))
-               (asm_with_const_global_table (add_const_global_table constant_table global_var_table asm_instructions_string))
-               (final_asm (add_prologue_epilgue asm_with_const_global_table)))
-     (string->file final_asm asm_target_file))))
-;super_parsed_list_with_fvar_define)))
+               (asm_with_const_global_string_table (add_const_global_string_table constant_table 
+                                                                                  global_var_table 
+                                                                                  list_table_of_rep_string 
+                                                                                  asm_instructions_string))
+               (final_asm (add_prologue_epilgue asm_with_const_global_string_table)))
+    (string->file final_asm asm_target_file))))
+;list_table_of_rep_string)))
 
 (define build_asm_insts_list
     (lambda (super_parsed_list const_tab global_tab)
@@ -647,10 +654,11 @@
             ""
             (string-append (car insts_list) (build_asm_insts_string (cdr insts_list))))))
 
-(define add_const_global_table 
-    (lambda (constant_table global_var_table asm_instructions_string)
+(define add_const_global_string_table 
+    (lambda (constant_table global_var_table string_table asm_instructions_string)
         (string-append (build_asm_constant_table constant_table)
                        (build_asm_global_table global_var_table (find_next_available_address constant_table))
+                       (build_asm_string_table string_table (find_next_available_address_after_global global_var_table constant_table))
                         asm_instructions_string)))
 
 (define parsed_and_hw3 
@@ -1028,8 +1036,66 @@ return 0;
             (append (run global_table)
                   super_parsed_list))))
 
+(define find_next_available_address_after_global
+    (lambda (global_table const_tab)
+         (if (null? global_table)
+             (find_next_available_address const_tab)
+             (let* ((last_element (car (reverse global_table)))
+                    (address (cadr last_element)))
+                (+ address 1)))))
 
 
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;REP-STRING-LIST;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(define build_initial_table_list_string
+    (lambda (const_tab next_available)
+        (let ((string_list (build_initial_list_string const_tab)))
+            (letrec ((run (lambda (lst next_add)
+                            (if (null? lst)
+                                lst
+                                (cons `(,(car lst) ,next_add)
+                                       (run (cdr lst) (+ next_add 1)))))))
+                (run string_list next_available)))))
+
+(define build_initial_list_string
+    (lambda (const_tab)
+        (if (null? const_tab)
+            (list)
+            (let* ((element (car const_tab))
+                   (element_rep (caddr element))
+                   (element_type (car element_rep)))
+                (if (equal? element_type 'T_SYMBOL)
+                    (cons (cadr element_rep) 
+                          (build_initial_list_string (cdr const_tab)))
+                    (build_initial_list_string (cdr const_tab)))))))
+
+(define build_asm_string_table
+    (lambda (string_table start_address)
+        (if (null? string_table)
+            "\n\n//----------STRING-TABLE----------//\n\n"
+            (let* ((last_element (car (reverse string_table)))
+                   (address (cadr last_element))
+                   (malloc_need (- (+ address 1) start_address))
+                   (malloc_need_str (number->string malloc_need)))
+                (string-append 
+                    "\n\n//----------STRING-TABLE----------//\n\n"
+                    "PUSH ("malloc_need_str");\n"
+                    "CALL (MALLOC);\n"
+                    "DROP (1);\n"
+                    (letrec ((run (lambda (lst)
+                                        (if (null? lst)
+                                            ""  
+                                             (let* ((element (car lst))
+                                                    (address (cadr element))
+                                                    (string_add (car element)))
+                                             
+                                                (string-append "MOV (IND("(number->string address)"), "(number->string string_add)");\n"
+                                                               (run (cdr lst))))))))
+                        (run string_table)))
+                    
+                ))))
 
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -1231,3 +1297,5 @@ return 0;
             "MOV(INDD(R0, 1), IMM(12345678)); \n"   ;env
             "MOV(INDD(R0, 2), LABEL(LMultiplyBody));\n"
             "MOV(IND(" (number->string (fvar_get_address_by_name 'multiply global_var_table)) "), R0);\n")))
+
+
