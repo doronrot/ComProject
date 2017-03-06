@@ -171,7 +171,7 @@
                                            "DROP (1);\n"
                                            "POP (R1);\n"
                                            "DROP (R1);\n"
-                                           "DROP (1);\n"
+                                           "DROP (1);\n"                    ;;???
                                            "JUMP (L_applic_exit_"count_str");\n"
                                            "L_error_cannot_apply_non_clos_"count_str":\n"
                                            "L_applic_exit_"count_str":\n")
@@ -200,24 +200,22 @@
                                            "CMP (INDD(R0, 0),IMM(T_CLOSURE));\n"
                                            "JUMP_NE (L_error_cannot_apply_non_clos_"count_str");\n"
                                            "PUSH (INDD(R0, 1));\n"
-                                           "MOV (R1, FPARG(-2));\n" ;old fp 1 - START FROM HERE
                                            "MOV (R2, FPARG(-1));\n" ;ret
-                                           "PUSH (R2);\n"   
-                                           "PUSH (R1);\n"
-                                           ; ; ;new frame instead of new:
+                                           "PUSH (R2);\n"
+                                           "MOV (R1, FPARG(-2));\n" ;old fp 1 - START FROM HERE
+                                           "MOV (R7,  R1);"
                                            "MOV (R3, 0);\n"
                                            "L_tc_applic_loop_"count_str":\n"
-                                           "CMP (R3, IMM("(number->string (+ 1 counter_up))"));\n"
+                                           "CMP (R3, IMM("(number->string counter_up)"));\n" ;??
                                            "JUMP_EQ (L_tc_applic_loop_exit_"count_str");\n"
-                                           "MOV (STACK(R1+1), LOCAL(R3));\n"
+                                           "MOV (STACK(R7), LOCAL(R3));\n"
                                            "ADD (R3, IMM(1));\n"
-                                           "ADD (R1, IMM(1));\n"
+                                           "ADD (R7, IMM(1));\n"
                                            "JUMP (L_tc_applic_loop_"count_str");\n"
                                            "L_tc_applic_loop_exit_"count_str":\n"
-                                           "MOV(SP, FP);\n"
-                                           "DROP ("(number->string(- counter_up 1))");\n"
-                                           ; ;done
                                            "MOV (FP, R1);\n"
+                                           "ADD (R3, FP);\n" ;??MAYBE THE NEW FP
+                                           "MOV (SP, R3);\n"
                                            "JUMPA (INDD(R0, 2));\n"
                                            "L_error_cannot_apply_non_clos_"count_str":\n"
                                            "")
@@ -242,11 +240,15 @@
                 (major_str (number->string major)))
             (string-append 
             "\n\n//----------LAMBDA-SIMPLE----------//\n\n"
+
+            "\n\n//----------lambda-simple-build-env----------//\n"
             "MOV (R1, FPARG(0));\n" ;env
             "PUSH (IMM(1+"major_str"));\n"
             "CALL (MALLOC);\n"
             "DROP (1);\n"
             "MOV (R2, R0);\n"
+
+            "\n\n//----------lambda-simple-build-env-shallow-copy----------//\n"
             (letrec ((shallow_copy 
                         (lambda (i j)
                             (let ((i_str (number->string i))
@@ -258,12 +260,13 @@
                                         "MOV (INDD(R2," j_str"), R4);\n"
                                         (shallow_copy (+ i 1) (+ j 1))))))))
                 (shallow_copy 0 1))
+
+            "\n\n//----------lambda-simple-build-env-from-stack----------//\n"
             "MOV (R3, FPARG(1));\n" ;number of argumets
             "PUSH (R3);\n"
             "CALL (MALLOC);\n"
             "DROP (1);\n"
             "MOV (INDD(R2, 0), R0);\n"
-
             "MOV (R6, 0);\n" ;i
             "MOV (R7, 2);\n" ;j
             "L_clos_loop_"count_str":\n"
@@ -277,19 +280,19 @@
             "JUMP (L_clos_loop_"count_str");\n"
             "L_clos_loop_end_"count_str":\n"
 
+            "\n\n//----------lambda-simple-build-closure----------//\n"
             "PUSH (IMM(3));\n"
             "CALL (MALLOC);\n"
             "DROP (1);\n"
             "MOV (INDD(R0, 0), IMM(T_CLOSURE));\n"
-            "MOV (INDD(R0, 1), R2);\n"  ;ext. env
-            
+            "MOV (INDD(R0, 1), R2);\n"  ;ext. env          
             "MOV (INDD(R0, 2), LABEL(L_clos_body_"count_str"));\n"
             "JUMP (L_clos_exit_"count_str");\n"
             
+            "\n\n//----------lambda-simple-body----------//\n"
             "L_clos_body_"count_str":\n"
             "PUSH (FP);\n"
             "MOV (FP,SP);\n"
-
             "CMP (FPARG(1), IMM("num_params_str"));\n"
             "JUMP_NE (L_error_lambda_args_count_"count_str");\n"
             (code-gen body (+ major 1) const_tab global_tab)
