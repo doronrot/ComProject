@@ -992,15 +992,6 @@ return 0;
                     "PUSH ("malloc_need_str");\n"
                     "CALL (MALLOC);\n"
                     "DROP (1);\n"
-                    ; (letrec ((run (lambda (lst)
-                    ;                     (if (null? lst)
-                    ;                         ""  
-                    ;                          (let* ((element (car lst))
-                    ;                                 (address (cadr element))
-                    ;                                 (rep (car element)))
-                    ;                             (string-append (build_string_for_global_element_memory address rep)
-                    ;                                            (run (cdr lst))))))))
-                    ;     (run global_table))) 
                     ))
             )))
 
@@ -1013,10 +1004,3 @@ return 0;
                 (if (equal? name element_name)
                     (cadr element)
                     (fvar_get_address_by_name name (cdr global_table)))))))
-
-
-
-; (define build_string_for_global_element_memory
-;     (lambda (address rep)
-;         (string-append
-;             "MOV (IND("(number->string address)"), "(symbol->string rep)");\n")))
