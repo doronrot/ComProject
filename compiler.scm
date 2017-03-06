@@ -14,6 +14,12 @@
               ((equal? pe `(const ())) (code-gen-nil))
               ((equal? pe `(const #f)) (code-gen-false))
               ((equal? pe `(const #t)) (code-gen-true))
+              ((equal? pe 'cons) (asm_cons global_tab))
+              ((equal? pe 'car) (asm_car global_tab))
+              ((equal? pe 'cdr) (asm_cdr global_tab))
+              ((equal? pe '+) (asm_plus global_tab))
+              ((equal? pe '-) (asm_minus global_tab))
+              ((equal? pe '*) (asm_multiply global_tab))
               ((pair? pe)
                ;TODO:,box
                (cond ((equal? (car pe) 'if3) (code-gen-if3 pe major const_tab global_tab))
@@ -31,7 +37,7 @@
                      ((and (equal? (car pe) 'set) (equal? (caadr pe) 'pvar)) (code-gen-set-pvar pe major const_tab global_tab))
                      ((and (equal? (car pe) 'set) (equal? (caadr pe) 'bvar)) (code-gen-set-bvar pe major const_tab global_tab))
                      ((and (equal? (car pe) 'set) (equal? (caadr pe) 'fvar)) (code-gen-set-fvar pe major const_tab global_tab))
-                     ((and (equal? (car pe) 'define) (equal? (caadr pe) 'fvar)) (code-gen-set-fvar pe major const_tab global_tab))
+                     ((and (equal? (car pe) 'def) (equal? (caadr pe) 'fvar)) (code-gen-set-fvar pe major const_tab global_tab))
                      ((and (equal? (car pe) 'box-get) (equal? (caadr pe) 'pvar)) (code-gen-box-get-pvar pe major))
                      ((and (equal? (car pe) 'box-get) (equal? (caadr pe) 'bvar)) (code-gen-box-get-bvar pe major))
                      ((and (equal? (car pe) 'box-set) (equal? (caadr pe) 'pvar)) (code-gen-box-set-pvar pe major const_tab global_tab))
@@ -543,7 +549,7 @@
                (value (caddr pe))
                (address (fvar_get_address_by_name var_name global_tab)))
         (string-append
-            "\n\n//----------SET-FVAR----------//\n\n"
+            "\n\n//----------SET/DEFINE-FVAR----------//\n\n"
             (code-gen value major const_tab global_tab)          
             "MOV (IND("(number->string address)"), R0);\n"
             "MOV (R0, SOB_VOID);\n"
@@ -620,12 +626,13 @@
                (super_parsed_list (parsed_and_hw3 sexprs_list))
                (constant_table (build_constant_table super_parsed_list))
                (global_var_table (build_global_var_table super_parsed_list (find_next_available_address constant_table)))
-               (asm_instructions_list (build_asm_insts_list super_parsed_list constant_table global_var_table))
+               (super_parsed_list_with_fvar_define (add_fvar_define super_parsed_list global_var_table))
+               (asm_instructions_list (build_asm_insts_list super_parsed_list_with_fvar_define constant_table global_var_table))
                (asm_instructions_string (build_asm_insts_string asm_instructions_list))
                (asm_with_const_global_table (add_const_global_table constant_table global_var_table asm_instructions_string))
                (final_asm (add_prologue_epilgue asm_with_const_global_table)))
-       (string->file final_asm asm_target_file))))
-;super_parsed_list)))
+     (string->file final_asm asm_target_file))))
+;super_parsed_list_with_fvar_define)))
 
 (define build_asm_insts_list
     (lambda (super_parsed_list const_tab global_tab)
@@ -1007,3 +1014,222 @@ return 0;
                 (if (equal? name element_name)
                     (cadr element)
                     (fvar_get_address_by_name name (cdr global_table)))))))
+
+(define add_fvar_define
+    (lambda (super_parsed_list global_table)
+        (letrec ((run (lambda (lst)
+                        (if (null? lst)
+                            lst
+                            (let* ((element (car lst))
+                                   (address (cadr element))
+                                   (name (car element)))
+                                (cons `(def (fvar ,name) ,name)
+                                       (run (cdr lst))))))))
+            (append (run global_table)
+                  super_parsed_list))))
+
+
+
+
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;RUN-TIME;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;  
+
+(define asm_car
+  (lambda (global_var_table)
+    (string-append
+        "JUMP(LmakeCarClos); \n"
+        "LcarBody: \n"
+            "PUSH(FP); \n"
+            "MOV(FP, SP); \n"
+            "CMP(FPARG(1), IMM(1)); \n"
+            "JUMP_NE(L_car_error_incorr_num_of_args);\n"
+            "MOV(R1, FPARG(2)); \n"
+            "CMP(INDD(R1, 0), IMM(T_PAIR)); \n"
+            "JUMP_NE(L_car_error_incorr_type); \n"
+            "MOV(R0,INDD(R1, 1)); \n"
+            "L_car_error_incorr_type:\n"
+            "L_car_error_incorr_num_of_args:\n"
+            "POP(FP); \n"
+            "RETURN; \n \n"
+        
+        "LmakeCarClos: \n"
+            "PUSH(IMM(3)); \n"
+            "CALL(MALLOC); \n"
+            "DROP(1); \n"
+            "MOV(INDD(R0, 0), IMM(T_CLOSURE)); \n"
+            "MOV(INDD(R0, 1), IMM(12345678)); \n"
+            "MOV(INDD(R0, 2), LABEL(LcarBody)); \n"
+            "MOV(IND(" (number->string (fvar_get_address_by_name 'car global_var_table)) "), R0);\n")))
+     
+
+(define asm_cdr
+  (lambda (global_var_table)
+    (string-append
+        "JUMP(LmakeCdrClos); \n"
+        "LcdrBody: \n"
+            "PUSH(FP); \n"
+            "MOV(FP, SP); \n"
+            "CMP(FPARG(1), IMM(1)); \n"
+            "JUMP_NE(L_cdr_error_incorr_num_of_args);\n"
+            "MOV(R1, FPARG(2)); \n"
+            "CMP(INDD(R1, 0), IMM(T_PAIR)); \n"
+            "JUMP_NE(L_cdr_error_incorr_type); \n"
+            "MOV(R0,INDD(R1, 2)); \n" ;index 2
+            "L_cdr_error_incorr_type:\n"
+            "L_cdr_error_incorr_num_of_args:\n"
+            "POP(FP); \n"
+            "RETURN; \n \n"
+        
+        "LmakeCdrClos: \n"
+            "PUSH(IMM(3)); \n"
+            "CALL(MALLOC); \n"
+            "DROP(1); \n"
+            "MOV(INDD(R0, 0), IMM(T_CLOSURE)); \n"
+            "MOV(INDD(R0, 1), IMM(12345678)); \n"
+            "MOV(INDD(R0, 2), LABEL(LcdrBody)); \n"
+            "MOV(IND(" (number->string (fvar_get_address_by_name 'cdr global_var_table)) "), R0);\n")))
+     
+
+(define asm_cons
+  (lambda (global_var_table)
+    (string-append
+        "JUMP(LmakeConsClos); \n"
+        "LconsBody: \n"
+            "PUSH(FP); \n"
+            "MOV(FP, SP); \n"
+            "CMP(FPARG(1), IMM(2)); \n" ;two args needed for pair
+            "JUMP_NE(L_cons_error_incorr_num_of_args);\n"
+            "PUSH(IMM(3)); \n"
+            "CALL(MALLOC); \n"
+            "DROP(1); \n"
+            "MOV(INDD(R0,0), IMM(T_PAIR));\n"
+            "MOV(INDD(R0,1), FPARG(2)); \n"
+            "MOV(INDD(R0,2), FPARG(3)); \n"
+            "L_cons_error_incorr_num_of_args:\n"
+            "POP(FP); \n"
+            "RETURN; \n \n"
+        
+        "LmakeConsClos: \n"
+            "PUSH(IMM(3)); \n"
+            "CALL(MALLOC); \n"
+            "DROP(1); \n"
+            "MOV(INDD(R0, 0), IMM(T_CLOSURE)); \n"
+            "MOV(INDD(R0, 1), IMM(12345678)); \n"   ;env
+            "MOV(INDD(R0, 2), LABEL(LconsBody));\n"
+            "MOV(IND(" (number->string (fvar_get_address_by_name 'cons global_var_table)) "), R0);\n")))
+     
+;TODO - it handles only int and not fracs
+(define asm_plus
+  (lambda (global_var_table)
+    (string-append
+        "JUMP(LmakePlusClos); \n"
+        "LPlusBody: \n"
+            "PUSH(FP); \n"
+            "MOV(FP, SP); \n"
+            "MOV(R1,FPARG(1));\n" ; R1: num params
+            "MOV(R2,IMM(0));\n"   ; R2: curr param
+            "MOV(R3,IMM(0));\n"   ; R3: acc
+        "LPlusLoop: \n"
+           "CMP (R2,R1);\n"
+           "JUMP_EQ(LPlusEnd); \n"
+           "ADD(R3,INDD(FPARG(2+R2),1));\n"
+           "ADD(R2,IMM(1));\n"
+           "JUMP (LPlusLoop);\n"
+        "LPlusEnd: \n"
+           "PUSH (R3);\n"
+           "CALL (MAKE_SOB_INTEGER);\n"
+           "DROP(1);\n"
+           "POP(FP); \n"
+           "RETURN; \n \n"
+        
+        "LmakePlusClos: \n"
+            "PUSH(IMM(3)); \n"
+            "CALL(MALLOC); \n"
+            "DROP(1); \n"
+            "MOV(INDD(R0, 0), IMM(T_CLOSURE)); \n"
+            "MOV(INDD(R0, 1), IMM(12345678)); \n"   ;env
+            "MOV(INDD(R0, 2), LABEL(LPlusBody));\n"
+            "MOV(IND(" (number->string (fvar_get_address_by_name 'plus global_var_table)) "), R0);\n")))
+
+;TODO - it handles only int and not fracs
+(define asm_minus
+  (lambda (global_var_table)
+    (string-append
+        "JUMP(LmakeMinusClos); \n"
+        "LMinusBody: \n"
+            "PUSH(FP); \n"
+            "MOV(FP, SP); \n"
+            "CMP (FPARG(1),IMM(0));\n"
+            "JUMP_EQ(LMinusZeroParams);\n"
+            "MOV(R1,FPARG(1));\n" ; R1: num params
+            "MOV(R2,IMM(1));\n"   ; R2: curr param
+            "MOV(R3,INDD(FPARG(2),1));\n"   ; R3: acc (first param)
+            "CMP (FPARG(1),IMM(1));\n"
+            "JUMP_EQ(LMinusOneParam);\n"    
+        "LMinusLoop: \n"
+           "CMP (R2,R1);\n"
+           "JUMP_EQ(LMinusEnd); \n"
+           "SUB(R3,INDD(FPARG(2+R2),1));\n"
+           "ADD(R2,IMM(1));\n"
+           "JUMP (LMinusLoop);\n"
+        "LMinusZeroParams: \n"
+            "MOV(R3,IMM(0));\n"
+           "JUMP_EQ(LMinusEnd); \n"
+        "LMinusOneParam: \n"
+            "MOV(R4,R3);\n"
+            "ADD(R4,R4);\n"
+            "SUB(R3,R4);\n "
+        "LMinusEnd: \n"
+           "PUSH (R3);\n"
+           "CALL (MAKE_SOB_INTEGER);\n"
+           "DROP(1);\n"
+           "POP(FP); \n"
+           "RETURN; \n \n"
+
+        "LmakeMinusClos: \n"
+            "PUSH(IMM(3)); \n"
+            "CALL(MALLOC); \n"
+            "DROP(1); \n"
+            "MOV(INDD(R0, 0), IMM(T_CLOSURE)); \n"
+            "MOV(INDD(R0, 1), IMM(12345678)); \n"   ;env
+            "MOV(INDD(R0, 2), LABEL(LMinusBody));\n"
+            "MOV(IND(" (number->string (fvar_get_address_by_name 'minus global_var_table)) "), R0);\n")))
+
+
+     
+;TODO - it handles only int and not fracs
+(define asm_multiply
+  (lambda (global_var_table)
+    (string-append
+        "JUMP(LmakeMultiplyClos); \n"
+        "LMultiplyBody: \n"
+            "PUSH(FP); \n"
+            "MOV(FP, SP); \n"
+            "MOV(R1,FPARG(1));\n" ; R1: num params
+            "MOV(R2,IMM(1));\n"   ; R2: curr param
+            "MOV(R3,INDD(FPARG(2),1));\n"   ; R3: acc (first param)
+        "LMultiplyLoop: \n"
+           "CMP (R2,R1);\n"
+           "JUMP_EQ(LMultiplyEnd); \n"
+           "MUL(R3,INDD(FPARG(2+R2),1));\n"
+           "ADD(R2,IMM(1));\n"
+           "JUMP (LMultiplyLoop);\n"
+        "LMultiplyEnd: \n"
+           "PUSH (R3);\n"
+           "CALL (MAKE_SOB_INTEGER);\n"
+           "DROP(1);\n"
+           "POP(FP); \n"
+           "RETURN; \n \n"
+        
+        "LmakeMultiplyClos: \n"
+            "PUSH(IMM(3)); \n"
+            "CALL(MALLOC); \n"
+            "DROP(1); \n"
+            "MOV(INDD(R0, 0), IMM(T_CLOSURE)); \n"
+            "MOV(INDD(R0, 1), IMM(12345678)); \n"   ;env
+            "MOV(INDD(R0, 2), LABEL(LMultiplyBody));\n"
+            "MOV(IND(" (number->string (fvar_get_address_by_name 'multiply global_var_table)) "), R0);\n")))
+
+
