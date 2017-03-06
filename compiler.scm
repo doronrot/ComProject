@@ -15,7 +15,7 @@
 			  ((equal? pe `(const #f)) (code-gen-false))
 			  ((equal? pe `(const #t)) (code-gen-true))
 			  ((pair? pe)
-               ;TODO: fvar, define ,box, set-fvar
+               ;TODO:,box
                (cond ((equal? (car pe) 'if3) (code-gen-if3 pe major const_tab global_tab))
                      ((equal? (car pe) 'seq) (code-gen-seq pe major const_tab global_tab))
                      ((equal? (car pe) 'or) (code-gen-or pe major const_tab global_tab))
@@ -30,6 +30,8 @@
                      ((equal? (car pe) 'fvar) (code-gen-fvar pe major global_tab))
                      ((and (equal? (car pe) 'set) (equal? (caadr pe) 'pvar)) (code-gen-set-pvar pe major const_tab global_tab))
                      ((and (equal? (car pe) 'set) (equal? (caadr pe) 'bvar)) (code-gen-set-bvar pe major const_tab global_tab))
+                     ((and (equal? (car pe) 'set) (equal? (caadr pe) 'fvar)) (code-gen-set-fvar pe major const_tab global_tab))
+                     ((and (equal? (car pe) 'define) (equal? (caadr pe) 'fvar)) (code-gen-set-fvar pe major const_tab global_tab))
                      ((and (equal? (car pe) 'box-get) (equal? (caadr pe) 'pvar)) (code-gen-box-get-pvar pe major))
                      ((and (equal? (car pe) 'box-get) (equal? (caadr pe) 'bvar)) (code-gen-box-get-bvar pe major))
                      ((and (equal? (car pe) 'box-set) (equal? (caadr pe) 'pvar)) (code-gen-box-set-pvar pe major const_tab global_tab))
@@ -517,7 +519,7 @@
             "MOV (R0, SOB_VOID);\n" 
             ))))
             
-(define code-gen-set-pvar
+(define code-gen-set-bvar
     (lambda (pe major const_tab global_tab)
         (let* ((complete_var (cadr pe))
                 (minor (cadddr complete_var))
@@ -531,6 +533,19 @@
             "MOV (R1, FPARG(0));\n" ;env
             "MOV (R1, INDD(R1," major_str"));\n"	   		
             "MOV (INDD(R1," minor_str"), R0);\n"
+            "MOV (R0, SOB_VOID);\n"
+            ))))
+
+(define code-gen-set-fvar
+    (lambda (pe major const_tab global_tab)
+        (let* ((complete_var (cadr pe))
+               (var_name (cadr complete_var))
+               (value (caddr pe))
+               (address (fvar_get_address_by_name var_name global_tab)))
+        (string-append
+            "\n\n//----------SET-FVAR----------//\n\n"
+            (code-gen value major const_tab global_tab)          
+            "MOV (IND("(number->string address)"), R0);\n"
             "MOV (R0, SOB_VOID);\n"
             ))))
 
@@ -610,7 +625,7 @@
 			   (asm_with_const_global_table (add_const_global_table constant_table global_var_table asm_instructions_string))
 			   (final_asm (add_prologue_epilgue asm_with_const_global_table)))
 			(string->file final_asm asm_target_file))))
-;global_var_table)))
+;constant_table)))
 
 (define build_asm_insts_list
 	(lambda (super_parsed_list const_tab global_tab)
@@ -908,7 +923,7 @@ return 0;
                 (address (car last_element))
                 (represent (caddr last_element))
                 (represent_length (length represent)))
-            (- (+ address represent_length) 1))))
+            (+ address represent_length))))
 
 
 (define build_string_for_element_memory
