@@ -1231,5 +1231,3 @@ return 0;
             "MOV(INDD(R0, 1), IMM(12345678)); \n"   ;env
             "MOV(INDD(R0, 2), LABEL(LMultiplyBody));\n"
             "MOV(IND(" (number->string (fvar_get_address_by_name 'multiply global_var_table)) "), R0);\n")))
-
-
