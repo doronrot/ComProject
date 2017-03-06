@@ -15,6 +15,7 @@
 			  ((equal? pe `(const #f)) (code-gen-false))
 			  ((equal? pe `(const #t)) (code-gen-true))
 			  ((pair? pe)
+               ;TODO: fvar, define ,box, set-fvar
                (cond ((equal? (car pe) 'if3) (code-gen-if3 pe major const_tab))
                      ((equal? (car pe) 'seq) (code-gen-seq pe major const_tab))
                      ((equal? (car pe) 'or) (code-gen-or pe major const_tab))
@@ -39,7 +40,7 @@
     (lambda ()
         (string-append
             ; "CALL (MAKE_SOB_VOID);\n"
-            "\n\n----------VOID----------\n\n"
+            "\n\n//----------VOID----------//\n\n"
             "MOV (R0, IMM(SOB_VOID));\n"
             ; "PUSH(R0);\n"
             ; "CALL(WRITE_SOB_VOID);\n"
@@ -50,7 +51,7 @@
     (lambda ()
         (string-append
             ; "CALL (MAKE_SOB_NIL);\n"
-            "\n\n----------NIL----------\n\n"				    
+            "\n\n//----------NIL----------//\n\n"				    
             "MOV(R0, IMM(SOB_NIL));\n"
             ; "PUSH(R0);\n"
             ; "CALL(WRITE_SOB_NIL);\n"
@@ -63,7 +64,7 @@
             ; "PUSH (IMM(0));\n"
             ; "CALL (MAKE_SOB_BOOL);\n"
             ; "DROP (1);\n"
-            "\n\n----------FALSE----------\n\n"
+            "\n\n//----------FALSE----------//\n\n"
             "MOV(R0, IMM(SOB_FALSE));\n"
             ; "PUSH(R0);\n"
             ; "CALL(WRITE_SOB_BOOL);\n"
@@ -76,7 +77,7 @@
             ; "PUSH (IMM(1));\n"
             ; "CALL (MAKE_SOB_BOOL);\n"
             ; "DROP (1);\n"
-            "\n\n----------TRUE----------\n\n"
+            "\n\n//----------TRUE----------//\n\n"
             "MOV(R0, IMM(SOB_TRUE));\n"
             ; "PUSH(R0);\n"
             ; "CALL(WRITE_SOB_BOOL);\n"
@@ -90,7 +91,7 @@
               (dit (caddr pe))
               (dif (cadddr pe))
               (count_str (number->string count)))
-            (string-append   "\n\n----------IF3----------\n\n"
+            (string-append   "\n\n//----------IF3----------//\n\n"
                             (code-gen test major const_tab)
                             "CMP (R0, IMM(SOB_FALSE));\n"
                             "JUMP_EQ (L_if3_else_"count_str");\n"
@@ -108,7 +109,7 @@
                                     ""
                                     (string-append (code-gen (car lst) major const_tab)
                                                    (run (cdr lst)))))))
-			   	 	(string-append "\n\n----------SEQ----------\n\n"
+			   	 	(string-append "\n\n//----------SEQ----------//\n\n"
                                     (run seq_body))))))
                                     
 (define code-gen-or
@@ -128,7 +129,7 @@
                                                 "CMP (R0, IMM(SOB_FALSE));\n"
                                                 "JUMP_NE (L_or_exit_"count_str");\n"
                                                 (run (cdr lst)))))))
-			  			 (string-append "\n\n----------OR----------\n\n"
+			  			 (string-append "\n\n//----------OR----------//\n\n"
                                         (run or_exps))))))
                                         
 (define code-gen-const
@@ -136,7 +137,7 @@
         (let* ((address (search_element (cadr pe) const_tab))
                 (address_str (number->string address)))
             (string-append
-                "\n\n----------CONST----------\n\n"
+                "\n\n//----------CONST----------//\n\n"
                 "MOV (R0, IMM("address_str"));\n")
             )))
                                     
@@ -170,7 +171,7 @@
   						 				   "PUSH (R0);\n"
   						 				   (run (cdr lst)))))))
 			  			(string-append
-                                "\n\n----------APPLIC----------\n\n"
+                                "\n\n//----------APPLIC----------//\n\n"
 			  					"PUSH (SOB_NIL);\n"
 								(run (reverse args)))))))
 ;TODO: FIX THE STACK FIX!
@@ -217,7 +218,7 @@
   						 				   "PUSH (R0);\n"
   						 				   (run (cdr lst) (+ counter_up 1)))))))
 			  		(string-append
-                                "\n\n----------TC-APPLIC----------\n\n"
+                                "\n\n//----------TC-APPLIC----------//\n\n"
                                 (run (reverse args) 3))))))
 
 (define code-gen-lambda-simple
@@ -231,7 +232,7 @@
                 (count_str (number->string count))
                 (major_str (number->string major)))
             (string-append 
-            "\n\n----------LAMBDA-SIMPLE----------\n\n"
+            "\n\n//----------LAMBDA-SIMPLE----------//\n\n"
             "MOV (R1, FPARG(0));\n"	;env
             "PUSH (IMM(1+"major_str"));\n"
             "CALL (MALLOC);\n"
@@ -304,7 +305,7 @@
                 (count_str (number->string count))
                 (major_str (number->string major)))
             (string-append 
-            "\n\n----------LAMBDA-OPT----------\n\n"
+            "\n\n//----------LAMBDA-OPT----------//\n\n"
             "MOV (R1, FPARG(0));\n"	;env
             "PUSH (IMM(1+"major_str"));\n"
             "CALL (MALLOC);\n"
@@ -393,7 +394,7 @@
                 (count_str (number->string count))
                 (major_str (number->string major)))
             (string-append 
-            "\n\n----------LAMBDA-VAR----------\n\n"
+            "\n\n//----------LAMBDA-VAR----------//\n\n"
             "MOV (R1, FPARG(0));\n"	;env
             "PUSH (IMM(1+"major_str"));\n"
             "CALL (MALLOC);\n"
@@ -476,7 +477,7 @@
         (let* ((minor (caddr pe)) 
                 (minor_str (number->string minor)))
         (string-append
-            "\n\n----------PVAR----------\n\n"
+            "\n\n//----------PVAR----------//\n\n"
             "MOV (R0, FPARG(2+"minor_str"));\n" ;the minor's argument
             ))))
             
@@ -487,7 +488,7 @@
                 (major_str (number->string major))
                 (minor_str (number->string minor)))
         (string-append
-            "\n\n----------BVAR----------\n\n"
+            "\n\n//----------BVAR----------//\n\n"
             "MOV (R0, FPARG(0));\n" ;env
             "MOV (R0, INDD(R0," major_str"));\n"	   		
             "MOV (R0, INDD(R0," minor_str"));\n"))))
@@ -499,7 +500,7 @@
                 (value (caddr pe)) 
                 (minor_str (number->string minor)))
         (string-append
-            "\n\n----------SET-PVAR----------\n\n"
+            "\n\n//----------SET-PVAR----------//\n\n"
             (code-gen value major const_tab)
             "MOV (FPARG(2+"minor_str"), R0);\n"
             "MOV (R0, SOB_VOID);\n" 
@@ -514,7 +515,7 @@
                 (minor_str (number->string minor))
                 (major_str (number->string major)))
         (string-append
-            "\n\n----------SET-BVAR----------\n\n"
+            "\n\n//----------SET-BVAR----------//\n\n"
             (code-gen value major const_tab)
             "MOV (R1, FPARG(0));\n" ;env
             "MOV (R1, INDD(R1," major_str"));\n"	   		
@@ -528,7 +529,7 @@
                 (minor (caddr complete_var))
                 (minor_str (number->string minor)))
         (string-append
-            "\n\n----------BOX-GET-PVAR----------\n\n"
+            "\n\n//----------BOX-GET-PVAR----------//\n\n"
             "MOV (R0, FPARG(2+"minor_str"));\n"
             "MOV (R0, IND(R0));\n"
             ))))
@@ -541,7 +542,7 @@
 			   		  (minor_str (number->string minor))
 			   		  (major_str (number->string major)))
 			   	(string-append
-			   	    "\n\n----------BOX-GET-BVAR----------\n\n"
+			   	    "\n\n//----------BOX-GET-BVAR----------//\n\n"
 			   		"MOV (R0, FPARG(0));\n" ;env
 			   		"MOV (R0, INDD(R0,"major_str"));\n"	   		
 			   		"MOV (R0, INDD(R0,"minor_str"));\n"
@@ -555,7 +556,7 @@
                 (value (caddr pe)) 
                 (minor_str (number->string minor)))
         (string-append
-            "\n\n----------BOX-SET-PVAR----------\n\n"
+            "\n\n//----------BOX-SET-PVAR----------//\n\n"
             (code-gen value major const_tab)
             "MOV (R1, FPARG(2+"minor_str"))"
             "MOV (IND(R1), R0);\n"
@@ -571,7 +572,7 @@
                 (minor_str (number->string minor))
                 (major_str (number->string major)))
         (string-append
-            "\n\n----------BOX-SET-BVAR----------\n\n"
+            "\n\n//----------BOX-SET-BVAR----------//\n\n"
             (code-gen value major const_tab)
             "MOV (R1, FPARG(0));\n" ;env
             "MOV (R1, INDD(R1,"major_str"));\n"	
@@ -592,13 +593,13 @@
 			   (sexprs_list (create_sexprs_list scm_content))
 			   (super_parsed_list (parsed_and_hw3 sexprs_list))
 			   (constant_table (build_constant_table super_parsed_list))
-			   (global_var_table (build_global_var_table super_parsed_list))
+			   (global_var_table (build_global_var_table super_parsed_list (find_next_available_address constant_table)))
 			   (asm_instructions_list (build_asm_insts_list super_parsed_list constant_table))
 			   (asm_instructions_string (build_asm_insts_string asm_instructions_list))
-			   (asm_with_const_table (add_const_table constant_table asm_instructions_string))
-			   (final_asm (add_prologue_epilgue asm_with_const_table)))
+			   (asm_with_const_global_table (add_const_global_table constant_table global_var_table asm_instructions_string))
+			   (final_asm (add_prologue_epilgue asm_with_const_global_table)))
 			(string->file final_asm asm_target_file))))
-;super_parsed_list)))
+;global_var_table)))
 
 (define build_asm_insts_list
 	(lambda (super_parsed_list const_tab)
@@ -613,10 +614,11 @@
 			""
 			(string-append (car insts_list) (build_asm_insts_string (cdr insts_list))))))
 
-(define add_const_table 
-	(lambda (constant_table asm_instructions_string)
+(define add_const_global_table 
+	(lambda (constant_table global_var_table asm_instructions_string)
 		(string-append (build_asm_constant_table constant_table)
-						asm_instructions_string)))
+					   (build_asm_global_table global_var_table (find_next_available_address constant_table))
+                        asm_instructions_string)))
 
 (define parsed_and_hw3 
 	(lambda (sexprs_list)
@@ -694,8 +696,6 @@ JUMP(CONTINUE);
 
 CONTINUE:
 
-/*TODO - should entered the constant_table*/
-
 PUSH(FP);
 MOV(FP, SP);
 
@@ -706,16 +706,16 @@ MOV(FP, SP);
 
 "
  asm_insts_string
-"
 
+"\n\n//----------PRINT----------//\n\n"
+
+"
 CMP(R0, SOB_VOID);
 JUMP_EQ(DONT_PRINT);
-
 PUSH(R0);
 CALL(WRITE_SOB);
 DROP(1);
 OUT(2,10);
-
 DONT_PRINT:
 
 POP(FP);
@@ -728,7 +728,6 @@ STOP_MACHINE;
 return 0;
 }"
 						)))
-
 
 						
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -763,7 +762,7 @@ return 0;
 			   (const_list_no_dups (remove-dups full_const_list))
 			   (full_sub_const_list (create_sub_const_list const_list_no_dups))
 			   (sub_const_list_no_dups (remove-dups full_sub_const_list))
-			   (final_list (build_final_list sub_const_list_no_dups)))
+			   (final_list (build_final_const_list sub_const_list_no_dups)))
 		 	final_list)))
 
 (define create_const_list
@@ -806,7 +805,7 @@ return 0;
 				(cons (car lst) (remove_nil (cdr lst)))))))
 
 
-(define build_final_list
+(define build_final_const_list
 	(lambda (sub_const_list_no_dups)
 		(let* ((firsts (build_firsts))
 			   (rests (build_rest sub_const_list_no_dups firsts 7)))
@@ -867,29 +866,39 @@ return 0;
 			 		(search_element element (cdr lst)))))))
 			 		
 (define build_asm_constant_table
-	(lambda (constant_table)
-		(let* ((last_element (car (reverse constant_table)))
-			   (address (car last_element))
-			   (represent (caddr last_element))
-		       (represent_length (length represent))
-		       (malloc_need (+ address represent_length))
-		       (malloc_need_str (number->string malloc_need)))
-			(string-append 
-				"PUSH ("malloc_need_str");\n"
-				"CALL (MALLOC);\n"
-				"DROP (1);\n"
-				(letrec ((run (lambda (lst)
-									(if (null? lst)
-										""	
-										 (let* ((element (car lst))
-										 	    (address (car element))
-										 	    (rep_lst (caddr element)))
-										 
-										 	(string-append (build_string_for_element_memory address rep_lst)
-										 	               (run (cdr lst))))))))
-					(run constant_table)))
-				
-			)))
+    (lambda (constant_table)
+        (let* ((last_element (car (reverse constant_table)))
+               (address (car last_element))
+               (represent (caddr last_element))
+               (represent_length (length represent))
+               (malloc_need (- (+ address represent_length) 1))
+               (malloc_need_str (number->string malloc_need)))
+            (string-append 
+                "\n\n//----------CONST-TABLE----------//\n\n"
+                "PUSH ("malloc_need_str");\n"
+                "CALL (MALLOC);\n"
+                "DROP (1);\n"
+                (letrec ((run (lambda (lst)
+                                    (if (null? lst)
+                                        ""  
+                                         (let* ((element (car lst))
+                                                (address (car element))
+                                                (rep_lst (caddr element)))
+                                         
+                                            (string-append (build_string_for_element_memory address rep_lst)
+                                                           (run (cdr lst))))))))
+                    (run constant_table)))
+                
+            )))
+
+(define find_next_available_address
+    (lambda (constant_table)
+         (let* ((last_element (car (reverse constant_table)))
+                (address (car last_element))
+                (represent (caddr last_element))
+                (represent_length (length represent)))
+            (- (+ address represent_length) 1))))
+
 
 (define build_string_for_element_memory
 	(lambda (address rep_lst)
@@ -911,7 +920,63 @@ return 0;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;	
 			
 (define build_global_var_table
-	(lambda (super_parsed_list)
-		(list)))
+	(lambda (super_parsed_list next_available_address)
+		(remove-dups (build_global_table_for_each_sexpr super_parsed_list next_available_address))))
 
 
+(define build_global_table_for_each_sexpr
+    (lambda (super_parsed_list next_available_address)
+        (if (null? super_parsed_list)
+            (list)
+            (append (build_global_table_for_sexpr (car super_parsed_list) next_available_address)
+                    (build_global_table_for_each_sexpr (cdr super_parsed_list) next_available_address)))))
+
+(define build_global_table_for_sexpr
+    (lambda (super_parsed_sexpr next_available_address)
+        (let* ((full_global_list (create_global_list super_parsed_sexpr))
+               (global_list_no_dups (remove-dups full_global_list))
+               (final_list (build_final_global_list global_list_no_dups next_available_address)))
+            final_list)))
+
+(define create_global_list
+    (lambda (sp_sexpr)
+        (cond ((or (null? sp_sexpr) (atom? sp_sexpr)) (list))
+              ((equal? (car sp_sexpr) 'fvar) (cdr sp_sexpr))
+              (else (append (create_global_list (car sp_sexpr))
+                            (create_global_list (cdr sp_sexpr)))))))
+
+(define build_final_global_list
+    (lambda (global_list next_available_address)
+        (if (null? global_list)
+            (list)
+            (cons `(,(car global_list) ,next_available_address)
+                     (build_final_global_list (cdr global_list) (+ 1 next_available_address))))))
+
+
+(define build_asm_global_table
+    (lambda (global_table start_address)
+        (let* ((last_element (car (reverse global_table)))
+               (address (cadr last_element))
+               (malloc_need (- (+ address 1) start_address))
+               (malloc_need_str (number->string malloc_need)))
+            (string-append 
+                "\n\n//----------GLOBAL-TABLE----------//\n\n"
+                "PUSH ("malloc_need_str");\n"
+                "CALL (MALLOC);\n"
+                "DROP (1);\n"
+                ; (letrec ((run (lambda (lst)
+                ;                     (if (null? lst)
+                ;                         ""  
+                ;                          (let* ((element (car lst))
+                ;                                 (address (cadr element))
+                ;                                 (rep (car element)))
+                ;                             (string-append (build_string_for_global_element_memory address rep)
+                ;                                            (run (cdr lst))))))))
+                ;     (run global_table))) 
+            )))
+
+
+; (define build_string_for_global_element_memory
+;     (lambda (address rep)
+;         (string-append
+;             "MOV (IND("(number->string address)"), "(symbol->string rep)");\n")))
