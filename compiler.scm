@@ -1,122 +1,166 @@
 (load "compiler_hw3.scm")
 
-;;;none-clear;;;
-;starg (inlib/char&io/ in some files)
-;addr(0) (in lib/system/malloc)
 
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;CODE-GEN;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (define count 0)
 
 (define code-gen
 	(lambda (pe major const_tab)
 		(cond 
-			 ;void
-			  ((equal? pe `(const ,(void)))
-				(string-append
-					; "CALL (MAKE_SOB_VOID);\n"
-					"MOV(R0, IMM(SOB_VOID));\n"
-					; "PUSH(R0);\n"
-					; "CALL(WRITE_SOB_VOID);\n"
-					; "POP(R0);\n"
-					))
-			  ;list
-			   ((equal? pe `(const ()))
-			   	 (string-append
-				    ; "CALL (MAKE_SOB_NIL);\n"
-				    "MOV(R0, IMM(SOB_NIL));\n"
-	 				; "PUSH(R0);\n"
-	 				; "CALL(WRITE_SOB_NIL);\n"
-	 				; "POP(R0);\n"
-	 				))
-			   ;#f
-			   ((equal? pe `(const #f))
-			   	 (string-append
-			   	 ; 	"PUSH (IMM(0));\n"
-				    ; "CALL (MAKE_SOB_BOOL);\n"
-				    ; "DROP (1);\n"
-				    "MOV(R0, IMM(SOB_FALSE));\n"
-	 				; "PUSH(R0);\n"
-	 				; "CALL(WRITE_SOB_BOOL);\n"
-	 				; "POP(R0);\n"
-	 				))
-			   ;#t
-			   ((equal? pe `(const #t)) 
-			  	 (string-append
-			   	 ; 	"PUSH (IMM(1));\n"
-				    ; "CALL (MAKE_SOB_BOOL);\n"
-				    ; "DROP (1);\n"
-				    "MOV(R0, IMM(SOB_TRUE));\n"
-	 				; "PUSH(R0);\n"
-	 				; "CALL(WRITE_SOB_BOOL);\n"
-	 				; "POP(R0);\n"
-	 				))
-			   ;if
-			  	((and (pair? pe) 
-			  	    (equal? (car pe) 'if3))
-			  	 (set! count (+ count 1))
-			  	 (let ((test (cadr pe))
-			  	 	   (dit (caddr pe))
-			  	 	   (dif (cadddr pe))
-			  	 	   (count_str (number->string count)))
-			  	 	(string-append (code-gen test major const_tab)
-			  	 				    "CMP (R0, IMM(SOB_FALSE));\n"
-			  	 				    "JUMP_EQ (L_if3_else_"count_str");\n"
-			  	 				    (code-gen dit major const_tab)
-			  	 				    "JUMP (L_if3_exit_"count_str");\n"
-			  	 				    "L_if3_else_"count_str":\n"
-			  	 				    (code-gen dif major const_tab)
-			  	 				    "L_if3_exit_"count_str":\n")))
-			  ;seq
-			  ((and (pair? pe) 
-			  	    (equal? (car pe) 'seq))
-			   (let ((seq_body (cadr pe)))
-			   	 (letrec ((run (lambda (lst)
-			   	 					(if (null? lst)
-			   	 						""
-			   	 						(string-append (code-gen (car lst) major const_tab)
-			   	 									   (run (cdr lst)))))))
-			   	 	(run seq_body))))
-			  	;or
-			  ((and (pair? pe)
-			  		(equal? (car pe) 'or))
-			  	(set! count (+ count 1))
-			  	(let ((or_exps (cadr pe))
-			  		  (count_str (number->string count)))
-			  		(letrec ((run (lambda (lst)
-			  						 (if (equal? (length lst) 1)
-			  						 	 (string-append (code-gen (car lst) major const_tab)
-			  						 	 				"L_or_exit_"count_str":\n"
-			  						 	 				; "PUSH (R0);\n"
-			  						 	 				; "CALL (WRITE_SOB);\n"
-			  						 	 				; "DROP (1);\n"
-			  						 	 				)
-			  						 	 (string-append (code-gen (car lst) major const_tab)
-			  						 	 				"CMP(R0, IMM(SOB_FALSE));\n"
-			  						 	 				"JUMP_NE(L_or_exit_"count_str");\n"
-			  						 	 				(run (cdr lst)))))))
-			  			 (run or_exps))))
-			  ;applic
-			  ((and (pair? pe) 
-			  		(equal? (car pe) 'applic))
-			  	(set! count (+ count 1))
-			  	(let* ((proc (cadr pe))
-			  		   (args (caddr pe))
-			  		   (args_count (length args))
-			  		   (args_count_str (number->string args_count))
-			  		   (count_str (number->string count)))
+			  ((equal? pe `(const ,(void))) (code-gen-void))
+              ((equal? pe `(const ())) (code-gen-nil))
+			  ((equal? pe `(const #f)) (code-gen-false))
+			  ((equal? pe `(const #t)) (code-gen-true))
+			  ((pair? pe)
+               (cond ((equal? (car pe) 'if3) (code-gen-if3 pe major const_tab))
+                     ((equal? (car pe) 'seq) (code-gen-seq pe major const_tab))
+                     ((equal? (car pe) 'or) (code-gen-or pe major const_tab))
+                     ((equal? (car pe) 'const) (code-gen-const pe major const_tab))
+                     ((equal? (car pe) 'applic) (code-gen-applic pe major const_tab))
+                     ((equal? (car pe) 'tc-applic) (code-gen-tc-applic pe major const_tab))
+                     ((equal? (car pe) 'lambda-simple) (code-gen-lambda-simple pe major const_tab))
+                     ((equal? (car pe) 'lambda-opt) (code-gen-lambda-opt pe major const_tab))
+                     ((equal? (car pe) 'lambda-var) (code-gen-lambda-var pe major const_tab))
+                     ((equal? (car pe) 'pvar) (code-gen-pvar pe major))
+                     ((equal? (car pe) 'bvar) (code-gen-bvar pe major))
+                     ((and (equal? (car pe) 'set) (equal? (caadr pe) 'pvar)) (code-gen-set-pvar pe major const_tab))
+                     ((and (equal? (car pe) 'set) (equal? (caadr pe) 'bvar)) (code-gen-set-bvar pe major const_tab))
+                     ((and (equal? (car pe) 'box-get) (equal? (caadr pe) 'pvar)) (code-gen-box-get-pvar pe major const_tab))
+                     ((and (equal? (car pe) 'box-get) (equal? (caadr pe) 'bvar)) (code-gen-box-get-bvar pe major const_tab))
+                     ((and (equal? (car pe) 'box-set) (equal? (caadr pe) 'pvar)) (code-gen-box-set-pvar pe major const_tab))
+                     ((and (equal? (car pe) 'box-set) (equal? (caadr pe) 'bvar)) (code-gen-box-set-bvar pe major const_tab))
+                     (else "")))
+			  (else "")))) 
+			  	
+(define code-gen-void
+    (lambda ()
+        (string-append
+            ; "CALL (MAKE_SOB_VOID);\n"
+            "\n\n----------VOID----------\n\n"
+            "MOV (R0, IMM(SOB_VOID));\n"
+            ; "PUSH(R0);\n"
+            ; "CALL(WRITE_SOB_VOID);\n"
+            ; "POP(R0);\n"
+        )))
+        
+(define code-gen-nil
+    (lambda ()
+        (string-append
+            ; "CALL (MAKE_SOB_NIL);\n"
+            "\n\n----------NIL----------\n\n"				    
+            "MOV(R0, IMM(SOB_NIL));\n"
+            ; "PUSH(R0);\n"
+            ; "CALL(WRITE_SOB_NIL);\n"
+            ; "POP(R0);\n"
+        )))
+        
+(define code-gen-false
+    (lambda ()
+        (string-append
+            ; "PUSH (IMM(0));\n"
+            ; "CALL (MAKE_SOB_BOOL);\n"
+            ; "DROP (1);\n"
+            "\n\n----------FALSE----------\n\n"
+            "MOV(R0, IMM(SOB_FALSE));\n"
+            ; "PUSH(R0);\n"
+            ; "CALL(WRITE_SOB_BOOL);\n"
+            ; "POP(R0);\n"
+        )))
+
+(define code-gen-true
+    (lambda ()
+        (string-append
+            ; "PUSH (IMM(1));\n"
+            ; "CALL (MAKE_SOB_BOOL);\n"
+            ; "DROP (1);\n"
+            "\n\n----------TRUE----------\n\n"
+            "MOV(R0, IMM(SOB_TRUE));\n"
+            ; "PUSH(R0);\n"
+            ; "CALL(WRITE_SOB_BOOL);\n"
+            ; "POP(R0);\n"
+	 	)))
+	 	
+(define code-gen-if3
+    (lambda (pe major const_tab)
+        (set! count (+ count 1))
+        (let ((test (cadr pe))
+              (dit (caddr pe))
+              (dif (cadddr pe))
+              (count_str (number->string count)))
+            (string-append   "\n\n----------IF3----------\n\n"
+                            (code-gen test major const_tab)
+                            "CMP (R0, IMM(SOB_FALSE));\n"
+                            "JUMP_EQ (L_if3_else_"count_str");\n"
+                            (code-gen dit major const_tab)
+                            "JUMP (L_if3_exit_"count_str");\n"
+                            "L_if3_else_"count_str":\n"
+                            (code-gen dif major const_tab)
+                            "L_if3_exit_"count_str":\n"))))
+                            
+(define code-gen-seq
+    (lambda (pe major const_tab)
+        (let ((seq_body (cadr pe)))
+            (letrec ((run (lambda (lst)
+                                (if (null? lst)
+                                    ""
+                                    (string-append (code-gen (car lst) major const_tab)
+                                                   (run (cdr lst)))))))
+			   	 	(string-append "\n\n----------SEQ----------\n\n"
+                                    (run seq_body))))))
+                                    
+(define code-gen-or
+    (lambda (pe major const_tab)
+        (set! count (+ count 1))
+        (let ((or_exps (cadr pe))
+              (count_str (number->string count)))
+            (letrec ((run (lambda (lst)
+                                (if (equal? (length lst) 1)
+                                    (string-append (code-gen (car lst) major const_tab)
+                                                "L_or_exit_"count_str":\n"
+                                                ; "PUSH (R0);\n"
+                                                ; "CALL (WRITE_SOB);\n"
+                                                ; "DROP (1);\n"
+                                                )
+                                    (string-append (code-gen (car lst) major const_tab)
+                                                "CMP (R0, IMM(SOB_FALSE));\n"
+                                                "JUMP_NE (L_or_exit_"count_str");\n"
+                                                (run (cdr lst)))))))
+			  			 (string-append "\n\n----------OR----------\n\n"
+                                        (run or_exps))))))
+                                        
+(define code-gen-const
+   (lambda (pe major const_tab)
+        (let* ((address (search_element (cadr pe) const_tab))
+                (address_str (number->string address)))
+            (string-append
+                "\n\n----------CONST----------\n\n"
+                "MOV (R0, IMM("address_str"));\n")
+            )))
+                                    
+(define code-gen-applic
+    (lambda (pe major const_tab)
+        (set! count (+ count 1))
+        (let* ((proc (cadr pe))
+                (args (caddr pe))
+                (args_count (length args))
+                (args_count_str (number->string args_count))
+                (count_str (number->string count)))
 			  		(letrec ((run (lambda (lst) 
 			  						 (if (null? lst)
 			  						 	 (string-append 
 			  						 	   "PUSH ("args_count_str");\n"
   						 				   (code-gen proc major const_tab)
-  						 				   "CMP (INDD(R0, 0),IMM(T_CLOSURE));\n"
+  						 				   "CMP (INDD(R0, 0), IMM(T_CLOSURE));\n"
   						 				   "JUMP_NE (L_error_cannot_apply_non_clos_"count_str");\n"
-  						 				   "PUSH (INDD(R0,1));\n"
-  						 				   "MOV (R4, INDD(R0,2));\n"
+  						 				   "PUSH (INDD(R0, 1));\n"
+  						 				   "MOV (R4, INDD(R0, 2));\n"
   						 				   "CALLA (R4);\n"
   						 				   "DROP (1);\n"
   						 				   "POP (R1);\n"
-  						 				   "DROP(R1);\n"
+  						 				   "DROP (R1);\n"
   						 				   "DROP (1);\n"
   						 				   "JUMP (L_applic_exit_"count_str");\n"
   						 				   "L_error_cannot_apply_non_clos_"count_str":\n"
@@ -125,380 +169,19 @@
 			  						 	   (code-gen (car lst) major const_tab)
   						 				   "PUSH (R0);\n"
   						 				   (run (cdr lst)))))))
-			  			(string-append	
-			  					"PUSH(SOB_NIL);\n"
-								(run (reverse args))))))
-			  ;lambda-simple
-			  ((and (pair? pe) 
-			  		(equal? (car pe) 'lambda-simple))
-			  	(set! count (+ count 1))
-			  	(let* (
-			  		   (params (cadr pe))
-			  		   (num_params (length params))
-			  		   (num_params_str (number->string num_params))
-			  		   (body (caddr pe))
-			  		   (count_str (number->string count))
-				  	   (major_str (number->string major)))
-			  	  (string-append 
-					"MOV (R1,FPARG(0));\n"	;env
-					"PUSH (IMM(1+"major_str"));\n"
-					"CALL(MALLOC);\n"
-					"DROP(1);\n"
-					"MOV (R2, R0);\n"
-					(letrec ((shallow_copy 
-								(lambda (i j)
-								   (let ((i_str (number->string i))
-								   		 (j_str (number->string j)))
-									   (if (>= i major)
-									   	   ""
-									   	   (string-append 
-									   	   	  "MOV (R4, INDD(R1,"i_str"));\n"
-									   	   	  "MOV (INDD(R2,"j_str"), R4);\n"
-									   	   	  (shallow_copy (+ i 1) (+ j 1))))))))
-					   	(shallow_copy 0 1))
-					"MOV(R3,FPARG(1));\n"	;number of argumets
-					"PUSH(R3);\n"
-					"CALL(MALLOC);\n"
-					"DROP(1);\n"
-					"MOV (INDD(R2,0), R0);\n"
-
-					"MOV (R6, 0);\n" ;i
-					"MOV (R7, 2);\n" ;j
-					"L_clos_loop_"count_str":\n"
-					"CMP (R6, R3);\n"
-					"JUMP_GE (L_clos_loop_end_"count_str");\n"
-					"MOV (R4, (INDD(R2,0)));\n"
-					"MOV (R5, FPARG(R7));\n"
-					"MOV (INDD(R4, R6), R5);\n"
-					"ADD (R6, IMM(1));\n"
-					"ADD (R7, IMM(1));\n"
-					"JUMP (L_clos_loop_"count_str");\n"
-					"L_clos_loop_end_"count_str":\n"
-
-					"PUSH (IMM(3));\n"
-					"CALL(MALLOC);\n"
-					"DROP(1);\n"
-					"MOV (INDD(R0,0),IMM(T_CLOSURE));\n"
-					"MOV (INDD(R0,1),R2);\n"	;ext. env
-					
-					"MOV (INDD(R0,2),LABEL(L_clos_body_"count_str"));\n"
-					"JUMP (L_clos_exit_"count_str");\n"
-					
-					"L_clos_body_"count_str":\n"
-					"PUSH (FP);\n"
-					"MOV (FP,SP);\n"
-
-					"CMP (FPARG(1),IMM("num_params_str"));\n"
-					"JUMP_NE (L_error_lambda_args_count_"count_str");\n"
-					(code-gen body (+ major 1) const_tab)
-					"JUMP (L_clos_ok_"count_str");\n"
-					"L_error_lambda_args_count_"count_str":\n"
-					"L_clos_ok_"count_str":\n"
-					"POP (FP);\n"
-					"RETURN;\n"		;return to caller
-					"L_clos_exit_"count_str":\n"
-					)))
-			  ;pvar
-			  ((and (pair? pe) 
-			  	    (equal? (car pe) 'pvar))
-			   (let* ((minor (caddr pe)) 
-			   		  (minor_str (number->string minor)))
-			   	(string-append
-			   		"MOV (R0, FPARG(2+"minor_str"));\n" ;the minor's argument
-			   		)))			  
-			  ;bvar
-			  ((and (pair? pe) 
-			  		(equal? (car pe) 'bvar))
-			   (let* ((major (caddr pe))
-			   		  (minor (cadddr pe))
-			   		  (major_str (number->string major))
-			   		  (minor_str (number->string minor)))
-			   	(string-append
-			   		"MOV (R0, FPARG(0));\n" ;env
-			   		"MOV (R0, INDD(R0,"major_str"));\n"	   		
-			   		"MOV (R0, INDD(R0,"minor_str"));\n")))
-			  ;set pvar
-			  ((and (pair? pe) 
-			  	    (equal? (car pe) 'set)
-			  	    (equal? (caadr pe) 'pvar))
-			   (let* ((complete_var (cadr pe))
-			   		  (minor (caddr complete_var))
-			   		  (value (caddr pe)) 
-			   		  (minor_str (number->string minor)))
-			   	(string-append
-			   		(code-gen value major const_tab)
-			   		"MOV (FPARG(2+"minor_str"), R0);\n"
-			   		"MOV (R0, SOB_VOID);\n" 
-			   		)))
-			  ;set bvar
-			  ((and (pair? pe) 
-			  	    (equal? (car pe) 'set)
-			  	    (equal? (caadr pe) 'bvar))
-			   (let* ((complete_var (cadr pe))
-			   		  (minor (cadddr complete_var))
-			   		  (major (caddr complete_var))
-			   		  (value (caddr pe)) 
-			   		  (minor_str (number->string minor))
-			   		  (major_str (number->string major)))
-			   	(string-append
-			   		(code-gen value major const_tab)
-			   		"MOV (R1, FPARG(0));\n" ;env
-			   		"MOV (R1, INDD(R1,"major_str"));\n"	   		
-			   		"MOV (INDD(R1,"minor_str"), R0);\n"
-			   		"MOV (R0, SOB_VOID);\n"
-			   		)))
-			  ;box-get pvar ;TODO - CHECK!! AFTER HANDLE WITH SEQ
-			  ((and (pair? pe) 
-			  	    (equal? (car pe) 'box-get)
-			  	    (equal? (caadr pe) 'pvar))
-			   (let* ((complete_var (cadr pe))
-			   		  (minor (caddr complete_var))
-			   		  (minor_str (number->string minor)))
-			   	(string-append
-			   		"MOV (R0, FPARG(2+"minor_str"));\n"
-			   		"MOV (R0, IND(R0));\n"
-			   		)))
-			  ;box-get bvar ;TODO - CHECK!! AFTER HANDLE WITH SEQ
-			  ((and (pair? pe) 
-			  	    (equal? (car pe) 'box-get)
-			  	    (equal? (caadr pe) 'bvar))
-			   (let* ((complete_var (cadr pe))
-			   		  (minor (cadddr complete_var))
-			   		  (major (caddr complete_var))
-			   		  (minor_str (number->string minor))
-			   		  (major_str (number->string major)))
-			   	(string-append
-			   		"MOV (R0, FPARG(0));\n" ;env
-			   		"MOV (R0, INDD(R0,"major_str"));\n"	   		
-			   		"MOV (R0, INDD(R0,"minor_str"));\n"
-			   		"MOV (R0, IND(R0));\n"
-			   		)))
-			  ;box-set pvar ;TODO - CHECK!! AFTER HANDLE WITH SEQ
-			  ((and (pair? pe) 
-			  	    (equal? (car pe) 'box-set)
-			  	    (equal? (caadr pe) 'pvar))
-			   (let* ((complete_var (cadr pe))
-			   		  (minor (caddr complete_var))
-			   		  (value (caddr pe)) 
-			   		  (minor_str (number->string minor)))
-			   	(string-append
-			   		(code-gen value major const_tab)
-			   		"MOV (R1, FPARG(2+"minor_str"))"
-			   		"MOV (IND(R1), R0);\n"
-			   		"MOV (R0, IMM(T_VOID));\n" ;IMPORTANT TODO!! - AFTER CONST TABLE CHANGE TO SOB_VOID
-			   		)))
-			  ;box-set bvar ;TODO - CHECK!! AFTER HANDLE WITH SEQ
-			  ((and (pair? pe) 
-			  	    (equal? (car pe) 'box-set)
-			  	    (equal? (caadr pe) 'bvar))
-			   (let* ((complete_var (cadr pe))
-			   		  (minor (cadddr complete_var))
-			   		  (major (caddr complete_var))
-			   		  (value (caddr pe)) 
-			   		  (minor_str (number->string minor))
-			   		  (major_str (number->string major)))
-			   	(string-append
-			   		(code-gen value major const_tab)
-			   		"MOV (R1, FPARG(0));\n" ;env
-			   		"MOV (R1, INDD(R1,"major_str"));\n"	
-			   		"MOV (R2, INDD(R1,"minor_str"));\n"   		
-			   		"MOV (IND(R2), R0);\n"
-			   		"MOV (R0, SOB_VOID);\n" ;IMPORTANT TODO!! - AFTER CONST TABLE CHANGE TO SOB_VOID
-			   		)))
-			  ;const
-			  ((and (pair? pe)
-			  	    (equal? (car pe) 'const))
-			    (let* ((address (search_element (cadr pe) const_tab))
-			    	   (address_str (number->string address)))
-			    	(string-append
-			  			"MOV (R0, IMM("address_str"));\n")
-			  		))
-			  ;lambda-opt
-			  ((and (pair? pe) 
-			  		(equal? (car pe) 'lambda-opt))
-			  	(set! count (+ count 1))
-			  	(let* (
-			  		   (must_params (cadr pe))
-			  		   (num_must_params (length must_params))
-			  		   (optional_params (+ num_must_params 1))
-			  		   (num_must_params_str (number->string num_must_params))
-			  		   (optional_params_str (number->string optional_params))
-			  		   (body (cadddr pe))
-			  		   (count_str (number->string count))
-				  	   (major_str (number->string major)))
-			  	  (string-append 
-					"MOV (R1,FPARG(0));\n"	;env
-					"PUSH (IMM(1+"major_str"));\n"
-					"CALL(MALLOC);\n"
-					"DROP(1);\n"
-					"MOV (R2, R0);\n"
-					(letrec ((shallow_copy 
-								(lambda (i j)
-								   (let ((i_str (number->string i))
-								   		 (j_str (number->string j)))
-									   (if (>= i major)
-									   	   ""
-									   	   (string-append 
-									   	   	  "MOV (R4, INDD(R1,"i_str"));\n"
-									   	   	  "MOV (INDD(R2,"j_str"), R4);\n"
-									   	   	  (shallow_copy (+ i 1) (+ j 1))))))))
-					   	(shallow_copy 0 1))
-					"MOV(R3,FPARG(1));\n"	;number of argumets
-					"PUSH(R3);\n"
-					"CALL(MALLOC);\n"
-					"DROP(1);\n"
-					"MOV (INDD(R2,0), R0);\n"
-
-					"MOV (R6, 0);\n" ;i
-					"MOV (R7, 2);\n" ;j
-					"L_clos_loop_"count_str":\n"
-					"CMP (R6, R3);\n"
-					"JUMP_GE (L_clos_loop_end_"count_str");\n"
-					"MOV (R4, (INDD(R2,0)));\n"
-					"MOV (R5, FPARG(R7));\n"
-					"MOV (INDD(R4, R6), R5);\n"
-					"ADD (R6, IMM(1));\n"
-					"ADD (R7, IMM(1));\n"
-					"JUMP (L_clos_loop_"count_str");\n"
-					"L_clos_loop_end_"count_str":\n"
-
-					"PUSH (IMM(3));\n"
-					"CALL(MALLOC);\n"
-					"DROP(1);\n"
-					"MOV (INDD(R0,0),IMM(T_CLOSURE));\n"
-					"MOV (INDD(R0,1),R2);\n"	;ext. env
-					
-					"MOV (INDD(R0,2),LABEL(L_clos_body_"count_str"));\n"
-					"JUMP (L_clos_exit_"count_str");\n"
-					
-					"L_clos_body_"count_str":\n"
-					"PUSH (FP);\n"
-					"MOV (FP,SP);\n"
-
-					;FIX STACK:
-					"MOV (R1, SOB_NIL);\n"
-					"ADD (R6, IMM(FPARG(1)));\n"
-					"L_clos_fix_stack_loop_"count_str":\n"
-					"CMP (R6, "num_must_params_str");\n"
-					"JUMP_LE (L_clos_fix_stack_out_"count_str");\n"
-					"PUSH (R1);\n"
-					"PUSH (FPARG(R6+1));\n"
-					"CALL (MAKE_SOB_PAIR);\n"
-					"DROP (2);\n"
-					"MOV (R1, R0);\n"
-					"SUB (R6, IMM(1));\n"
-					"JUMP (L_clos_fix_stack_loop_"count_str");\n"
-					"L_clos_fix_stack_out_"count_str":\n"
-
-					"MOV (FPARG(2+"num_must_params_str"),R1);\n"
-			  	  	"MOV (FPARG(1),"optional_params_str");\n"
-
-					"CMP (FPARG(1),IMM("optional_params_str"));\n"
-					"JUMP_NE (L_error_lambda_args_count_"count_str");\n"
-					(code-gen body (+ major 1) const_tab)
-					"JUMP (L_clos_ok_"count_str");\n"
-					"L_error_lambda_args_count_"count_str":\n"
-					"L_clos_ok_"count_str":\n"
-					"POP (FP);\n"
-					"RETURN;\n"		;return to caller
-					"L_clos_exit_"count_str":\n"
-					)))
-			  ;lambda-var
-			  ((and (pair? pe) 
-			  		(equal? (car pe) 'lambda-var))
-			  	(set! count (+ count 1))
-			  	(let* (
-			  		   (optional_params 1)
-			  		   (optional_params_str (number->string optional_params))
-			  		   (body (caddr pe))
-			  		   (count_str (number->string count))
-				  	   (major_str (number->string major)))
-			  	  (string-append 
-					"MOV (R1,FPARG(0));\n"	;env
-					"PUSH (IMM(1+"major_str"));\n"
-					"CALL(MALLOC);\n"
-					"DROP(1);\n"
-					"MOV (R2, R0);\n"
-					(letrec ((shallow_copy 
-								(lambda (i j)
-								   (let ((i_str (number->string i))
-								   		 (j_str (number->string j)))
-									   (if (>= i major)
-									   	   ""
-									   	   (string-append 
-									   	   	  "MOV (R4, INDD(R1,"i_str"));\n"
-									   	   	  "MOV (INDD(R2,"j_str"), R4);\n"
-									   	   	  (shallow_copy (+ i 1) (+ j 1))))))))
-					   	(shallow_copy 0 1))
-					"MOV(R3,FPARG(1));\n"	;number of argumets
-					"PUSH(R3);\n"
-					"CALL(MALLOC);\n"
-					"DROP(1);\n"
-					"MOV (INDD(R2,0), R0);\n"
-
-					"MOV (R6, 0);\n" ;i
-					"MOV (R7, 2);\n" ;j
-					"L_clos_loop_"count_str":\n"
-					"CMP (R6, R3);\n"
-					"JUMP_GE (L_clos_loop_end_"count_str");\n"
-					"MOV (R4, (INDD(R2,0)));\n"
-					"MOV (R5, FPARG(R7));\n"
-					"MOV (INDD(R4, R6), R5);\n"
-					"ADD (R6, IMM(1));\n"
-					"ADD (R7, IMM(1));\n"
-					"JUMP (L_clos_loop_"count_str");\n"
-					"L_clos_loop_end_"count_str":\n"
-
-					"PUSH (IMM(3));\n"
-					"CALL(MALLOC);\n"
-					"DROP(1);\n"
-					"MOV (INDD(R0,0),IMM(T_CLOSURE));\n"
-					"MOV (INDD(R0,1),R2);\n"	;ext. env
-					
-					"MOV (INDD(R0,2),LABEL(L_clos_body_"count_str"));\n"
-					"JUMP (L_clos_exit_"count_str");\n"
-					
-					"L_clos_body_"count_str":\n"
-					"PUSH (FP);\n"
-					"MOV (FP,SP);\n"
-
-					;FIX STACK:
-					"MOV (R1, SOB_NIL);\n"
-					"ADD (R6, IMM(FPARG(1)));\n"
-					"L_clos_fix_stack_loop_"count_str":\n"
-					"CMP (R6, 0);\n"
-					"JUMP_LE (L_clos_fix_stack_out_"count_str");\n"
-					"PUSH (R1);\n"
-					"PUSH (FPARG(R6+1));\n"
-					"CALL (MAKE_SOB_PAIR);\n"
-					"DROP (2);\n"
-					"MOV (R1, R0);\n"
-					"SUB (R6, IMM(1));\n"
-					"JUMP (L_clos_fix_stack_loop_"count_str");\n"
-					"L_clos_fix_stack_out_"count_str":\n"
-
-					"MOV (FPARG(2),R1);\n"
-			  	  	"MOV (FPARG(1),"optional_params_str");\n"
-
-					"CMP (FPARG(1),IMM("optional_params_str"));\n"
-					"JUMP_NE (L_error_lambda_args_count_"count_str");\n"
-					(code-gen body (+ major 1) const_tab)
-					"JUMP (L_clos_ok_"count_str");\n"
-					"L_error_lambda_args_count_"count_str":\n"
-					"L_clos_ok_"count_str":\n"
-					"POP (FP);\n"
-					"RETURN;\n"		;return to caller
-					"L_clos_exit_"count_str":\n"
-					)))
-			  ;tc-applic
-			  ((and (pair? pe) 
-			  		(equal? (car pe) 'tc-applic))
-			  	(set! count (+ count 1))
-			  	(let* ((proc (cadr pe))
-			  		   (args (caddr pe))
-			  		   (args_count (length args))
-			  		   (args_count_str (number->string args_count))
-			  		   (count_str (number->string count)))
+			  			(string-append
+                                "\n\n----------APPLIC----------\n\n"
+			  					"PUSH (SOB_NIL);\n"
+								(run (reverse args)))))))
+;TODO: FIX THE STACK FIX!
+(define code-gen-tc-applic
+    (lambda (pe major const_tab)
+        (set! count (+ count 1))
+        (let* ((proc (cadr pe))
+                (args (caddr pe))
+                (args_count (length args))
+                (args_count_str (number->string args_count))
+                (count_str (number->string count)))
 			  		(letrec ((run (lambda (lst counter_up) 
 			  						 (if (null? lst)
 			  						 	 (string-append 
@@ -506,17 +189,12 @@
   						 				   (code-gen proc major const_tab)
   						 				   "CMP (INDD(R0, 0),IMM(T_CLOSURE));\n"
   						 				   "JUMP_NE (L_error_cannot_apply_non_clos_"count_str");\n"
-  						 				   "PUSH (INDD(R0,1));\n"
+  						 				   "PUSH (INDD(R0, 1));\n"
 										   "MOV (R1, FPARG(-2));\n" ;old fp 1 - START FROM HERE
 										   "MOV (R2, FPARG(-1));\n" ;ret
 										   "PUSH (R2);\n"	
 										   "PUSH (R1);\n"
-  						 				   ; "PUSH (INDD(R0,1));\n" ;env
-  						 				   ; "PUSH (FPARG(-1));\n" ;old return address
-  						 				   ; "MOV (R1, FPARG(-2));\n"
   						 				   ; ; ;new frame instead of new:
-  						 				   ; "MOV (R2, FPARG(1));\n" ;num of params
-  						 				   ; "MOV (R2, (R2+R1));\n" ;start of prev frame
   						 				   "MOV (R3, 0);\n"
   						 				   "L_tc_applic_loop_"count_str":\n"
   						 				   "CMP (R3, IMM("(number->string (+ 1 counter_up))"));\n"
@@ -527,11 +205,10 @@
   						 				   "JUMP (L_tc_applic_loop_"count_str");\n"
   						 				   "L_tc_applic_loop_exit_"count_str":\n"
   						 				   "MOV(SP, FP);\n"
-  						 				   ; "DROP (3);"
   						 				   "DROP ("(number->string(- counter_up 1))");\n"
   						 				   ; ;done
   						 				   "MOV (FP, R1);\n"
-  						 				   "JUMPA (INDD(R0,2));\n"
+  						 				   "JUMPA (INDD(R0, 2));\n"
   						 				   "L_error_cannot_apply_non_clos_"count_str":\n"
   						 				   "")
 
@@ -539,12 +216,374 @@
 			  						 	   (code-gen (car lst) major const_tab)
   						 				   "PUSH (R0);\n"
   						 				   (run (cdr lst) (+ counter_up 1)))))))
-			  		(run (reverse args) 3))))
+			  		(string-append
+                                "\n\n----------TC-APPLIC----------\n\n"
+                                (run (reverse args) 3))))))
 
-			  ;else
-			  (else "") 
-			  	)))
+(define code-gen-lambda-simple
+    (lambda (pe major const_tab)
+        (set! count (+ count 1))
+        (let* (
+                (params (cadr pe))
+                (num_params (length params))
+                (num_params_str (number->string num_params))
+                (body (caddr pe))
+                (count_str (number->string count))
+                (major_str (number->string major)))
+            (string-append 
+            "\n\n----------LAMBDA-SIMPLE----------\n\n"
+            "MOV (R1, FPARG(0));\n"	;env
+            "PUSH (IMM(1+"major_str"));\n"
+            "CALL (MALLOC);\n"
+            "DROP (1);\n"
+            "MOV (R2, R0);\n"
+            (letrec ((shallow_copy 
+                        (lambda (i j)
+                            (let ((i_str (number->string i))
+                                    (j_str (number->string j)))
+                                (if (>= i major)
+                                    ""
+                                    (string-append 
+                                        "MOV (R4, INDD(R1," i_str"));\n"
+                                        "MOV (INDD(R2," j_str"), R4);\n"
+                                        (shallow_copy (+ i 1) (+ j 1))))))))
+                (shallow_copy 0 1))
+            "MOV (R3, FPARG(1));\n"	;number of argumets
+            "PUSH (R3);\n"
+            "CALL (MALLOC);\n"
+            "DROP (1);\n"
+            "MOV (INDD(R2, 0), R0);\n"
 
+            "MOV (R6, 0);\n" ;i
+            "MOV (R7, 2);\n" ;j
+            "L_clos_loop_"count_str":\n"
+            "CMP (R6, R3);\n"
+            "JUMP_GE (L_clos_loop_end_"count_str");\n"
+            "MOV (R4, (INDD(R2, 0)));\n"
+            "MOV (R5, FPARG(R7));\n"
+            "MOV (INDD(R4, R6), R5);\n"
+            "ADD (R6, IMM(1));\n"
+            "ADD (R7, IMM(1));\n"
+            "JUMP (L_clos_loop_"count_str");\n"
+            "L_clos_loop_end_"count_str":\n"
+
+            "PUSH (IMM(3));\n"
+            "CALL (MALLOC);\n"
+            "DROP (1);\n"
+            "MOV (INDD(R0, 0), IMM(T_CLOSURE));\n"
+            "MOV (INDD(R0, 1), R2);\n"	;ext. env
+            
+            "MOV (INDD(R0, 2), LABEL(L_clos_body_"count_str"));\n"
+            "JUMP (L_clos_exit_"count_str");\n"
+            
+            "L_clos_body_"count_str":\n"
+            "PUSH (FP);\n"
+            "MOV (FP,SP);\n"
+
+            "CMP (FPARG(1), IMM("num_params_str"));\n"
+            "JUMP_NE (L_error_lambda_args_count_"count_str");\n"
+            (code-gen body (+ major 1) const_tab)
+            "JUMP (L_clos_ok_"count_str");\n"
+            "L_error_lambda_args_count_"count_str":\n"
+            "L_clos_ok_"count_str":\n"
+            "POP (FP);\n"
+            "RETURN;\n"		;return to caller
+            "L_clos_exit_"count_str":\n"
+            ))))
+
+(define code-gen-lambda-opt
+    (lambda (pe major const_tab)
+        (set! count (+ count 1))
+        (let* (
+                (must_params (cadr pe))
+                (num_must_params (length must_params))
+                (optional_params (+ num_must_params 1))
+                (num_must_params_str (number->string num_must_params))
+                (optional_params_str (number->string optional_params))
+                (body (cadddr pe))
+                (count_str (number->string count))
+                (major_str (number->string major)))
+            (string-append 
+            "\n\n----------LAMBDA-OPT----------\n\n"
+            "MOV (R1, FPARG(0));\n"	;env
+            "PUSH (IMM(1+"major_str"));\n"
+            "CALL (MALLOC);\n"
+            "DROP (1);\n"
+            "MOV (R2, R0);\n"
+            (letrec ((shallow_copy 
+                        (lambda (i j)
+                            (let ((i_str (number->string i))
+                                    (j_str (number->string j)))
+                                (if (>= i major)
+                                    ""
+                                    (string-append 
+                                        "MOV (R4, INDD(R1," i_str"));\n"
+                                        "MOV (INDD(R2," j_str"), R4);\n"
+                                        (shallow_copy (+ i 1) (+ j 1))))))))
+                (shallow_copy 0 1))
+            "MOV (R3, FPARG(1));\n"	;number of argumets
+            "PUSH (R3);\n"
+            "CALL (MALLOC);\n"
+            "DROP (1);\n"
+            "MOV (INDD(R2, 0), R0);\n"
+
+            "MOV (R6, 0);\n" ;i
+            "MOV (R7, 2);\n" ;j
+            "L_clos_loop_"count_str":\n"
+            "CMP (R6, R3);\n"
+            "JUMP_GE (L_clos_loop_end_"count_str");\n"
+            "MOV (R4, (INDD(R2, 0)));\n"
+            "MOV (R5, FPARG(R7));\n"
+            "MOV (INDD(R4, R6), R5);\n"
+            "ADD (R6, IMM(1));\n"
+            "ADD (R7, IMM(1));\n"
+            "JUMP (L_clos_loop_"count_str");\n"
+            "L_clos_loop_end_"count_str":\n"
+
+            "PUSH (IMM(3));\n"
+            "CALL (MALLOC);\n"
+            "DROP (1);\n"
+            "MOV (INDD(R0, 0), IMM(T_CLOSURE));\n"
+            "MOV (INDD(R0 ,1), R2);\n"	;ext. env
+            
+            "MOV (INDD(R0, 2), LABEL(L_clos_body_"count_str"));\n"
+            "JUMP (L_clos_exit_"count_str");\n"
+            
+            "L_clos_body_"count_str":\n"
+            "PUSH (FP);\n"
+            "MOV (FP,SP);\n"
+
+            ;FIX STACK:
+            "MOV (R1, SOB_NIL);\n"
+            "ADD (R6, IMM(FPARG(1)));\n"
+            "L_clos_fix_stack_loop_"count_str":\n"
+            "CMP (R6, "num_must_params_str");\n"
+            "JUMP_LE (L_clos_fix_stack_out_"count_str");\n"
+            "PUSH (R1);\n"
+            "PUSH (FPARG(R6+1));\n"
+            "CALL (MAKE_SOB_PAIR);\n"
+            "DROP (2);\n"
+            "MOV (R1, R0);\n"
+            "SUB (R6, IMM(1));\n"
+            "JUMP (L_clos_fix_stack_loop_"count_str");\n"
+            "L_clos_fix_stack_out_"count_str":\n"
+
+            "MOV (FPARG(2+"num_must_params_str"),R1);\n"
+            "MOV (FPARG(1)," optional_params_str");\n"
+
+            "CMP (FPARG(1), IMM("optional_params_str"));\n"
+            "JUMP_NE (L_error_lambda_args_count_"count_str");\n"
+            (code-gen body (+ major 1) const_tab)
+            "JUMP (L_clos_ok_"count_str");\n"
+            "L_error_lambda_args_count_"count_str":\n"
+            "L_clos_ok_"count_str":\n"
+            "POP (FP);\n"
+            "RETURN;\n"		;return to caller
+            "L_clos_exit_"count_str":\n"
+            ))))
+            
+            
+(define code-gen-lambda-var 
+    (lambda (pe major const_tab)
+        (set! count (+ count 1))
+        (let* (
+                (optional_params 1)
+                (optional_params_str (number->string optional_params))
+                (body (caddr pe))
+                (count_str (number->string count))
+                (major_str (number->string major)))
+            (string-append 
+            "\n\n----------LAMBDA-VAR----------\n\n"
+            "MOV (R1, FPARG(0));\n"	;env
+            "PUSH (IMM(1+"major_str"));\n"
+            "CALL (MALLOC);\n"
+            "DROP (1);\n"
+            "MOV (R2, R0);\n"
+            (letrec ((shallow_copy 
+                        (lambda (i j)
+                            (let ((i_str (number->string i))
+                                    (j_str (number->string j)))
+                                (if (>= i major)
+                                    ""
+                                    (string-append 
+                                        "MOV (R4, INDD(R1," i_str"));\n"
+                                        "MOV (INDD(R2," j_str"), R4);\n"
+                                        (shallow_copy (+ i 1) (+ j 1))))))))
+                (shallow_copy 0 1))
+            "MOV (R3, FPARG(1));\n"	;number of argumets
+            "PUSH (R3);\n"
+            "CALL (MALLOC);\n"
+            "DROP (1);\n"
+            "MOV (INDD(R2, 0), R0);\n"
+
+            "MOV (R6, 0);\n" ;i
+            "MOV (R7, 2);\n" ;j
+            "L_clos_loop_"count_str":\n"
+            "CMP (R6, R3);\n"
+            "JUMP_GE (L_clos_loop_end_"count_str");\n"
+            "MOV (R4, (INDD(R2, 0)));\n"
+            "MOV (R5, FPARG(R7));\n"
+            "MOV (INDD(R4, R6), R5);\n"
+            "ADD (R6, IMM(1));\n"
+            "ADD (R7, IMM(1));\n"
+            "JUMP (L_clos_loop_"count_str");\n"
+            "L_clos_loop_end_"count_str":\n"
+
+            "PUSH (IMM(3));\n"
+            "CALL (MALLOC);\n"
+            "DROP (1);\n"
+            "MOV (INDD(R0, 0), IMM(T_CLOSURE));\n"
+            "MOV (INDD(R0, 1), R2);\n"	;ext. env
+            
+            "MOV (INDD(R0, 2),LABEL(L_clos_body_"count_str"));\n"
+            "JUMP (L_clos_exit_"count_str");\n"
+            
+            "L_clos_body_"count_str":\n"
+            "PUSH (FP);\n"
+            "MOV (FP,SP);\n"
+
+            ;FIX STACK:
+            "MOV (R1, SOB_NIL);\n"
+            "ADD (R6, IMM(FPARG(1)));\n"
+            "L_clos_fix_stack_loop_"count_str":\n"
+            "CMP (R6, 0);\n"
+            "JUMP_LE (L_clos_fix_stack_out_"count_str");\n"
+            "PUSH (R1);\n"
+            "PUSH (FPARG(R6+1));\n"
+            "CALL (MAKE_SOB_PAIR);\n"
+            "DROP (2);\n"
+            "MOV (R1, R0);\n"
+            "SUB (R6, IMM(1));\n"
+            "JUMP (L_clos_fix_stack_loop_"count_str");\n"
+            "L_clos_fix_stack_out_"count_str":\n"
+
+            "MOV (FPARG(2), R1);\n"
+            "MOV (FPARG(1)," optional_params_str");\n"
+
+            "CMP (FPARG(1), IMM("optional_params_str"));\n"
+            "JUMP_NE (L_error_lambda_args_count_"count_str");\n"
+            (code-gen body (+ major 1) const_tab)
+            "JUMP (L_clos_ok_"count_str");\n"
+            "L_error_lambda_args_count_"count_str":\n"
+            "L_clos_ok_"count_str":\n"
+            "POP (FP);\n"
+            "RETURN;\n"		;return to caller
+            "L_clos_exit_"count_str":\n"
+					))))
+					
+(define code-gen-pvar
+    (lambda (pe major)
+        (let* ((minor (caddr pe)) 
+                (minor_str (number->string minor)))
+        (string-append
+            "\n\n----------PVAR----------\n\n"
+            "MOV (R0, FPARG(2+"minor_str"));\n" ;the minor's argument
+            ))))
+            
+(define code-gen-bvar
+    (lambda (pe major)
+        (let* ((major (caddr pe))
+                (minor (cadddr pe))
+                (major_str (number->string major))
+                (minor_str (number->string minor)))
+        (string-append
+            "\n\n----------BVAR----------\n\n"
+            "MOV (R0, FPARG(0));\n" ;env
+            "MOV (R0, INDD(R0," major_str"));\n"	   		
+            "MOV (R0, INDD(R0," minor_str"));\n"))))
+            
+(define code-gen-set-pvar
+    (lambda (pe major const_tab)
+        (let* ((complete_var (cadr pe))
+                (minor (caddr complete_var))
+                (value (caddr pe)) 
+                (minor_str (number->string minor)))
+        (string-append
+            "\n\n----------SET-PVAR----------\n\n"
+            (code-gen value major const_tab)
+            "MOV (FPARG(2+"minor_str"), R0);\n"
+            "MOV (R0, SOB_VOID);\n" 
+            ))))
+            
+(define code-gen-set-pvar
+    (lambda (pe major const_tab)
+        (let* ((complete_var (cadr pe))
+                (minor (cadddr complete_var))
+                (major (caddr complete_var))
+                (value (caddr pe)) 
+                (minor_str (number->string minor))
+                (major_str (number->string major)))
+        (string-append
+            "\n\n----------SET-BVAR----------\n\n"
+            (code-gen value major const_tab)
+            "MOV (R1, FPARG(0));\n" ;env
+            "MOV (R1, INDD(R1," major_str"));\n"	   		
+            "MOV (INDD(R1," minor_str"), R0);\n"
+            "MOV (R0, SOB_VOID);\n"
+            ))))
+
+(define code-gen-box-get-pvar
+    (lambda (pe major const_tab)
+        (let* ((complete_var (cadr pe))
+                (minor (caddr complete_var))
+                (minor_str (number->string minor)))
+        (string-append
+            "\n\n----------BOX-GET-PVAR----------\n\n"
+            "MOV (R0, FPARG(2+"minor_str"));\n"
+            "MOV (R0, IND(R0));\n"
+            ))))
+            
+(define code-gen-box-get-bvar
+    (lambda (pe major const_tab)
+			   (let* ((complete_var (cadr pe))
+			   		  (minor (cadddr complete_var))
+			   		  (major (caddr complete_var))
+			   		  (minor_str (number->string minor))
+			   		  (major_str (number->string major)))
+			   	(string-append
+			   	    "\n\n----------BOX-GET-BVAR----------\n\n"
+			   		"MOV (R0, FPARG(0));\n" ;env
+			   		"MOV (R0, INDD(R0,"major_str"));\n"	   		
+			   		"MOV (R0, INDD(R0,"minor_str"));\n"
+			   		"MOV (R0, IND(R0));\n"
+			   		))))
+			   		
+(define code-gen-box-set-pvar
+    (lambda (pe major const_tab)
+        (let* ((complete_var (cadr pe))
+                (minor (caddr complete_var))
+                (value (caddr pe)) 
+                (minor_str (number->string minor)))
+        (string-append
+            "\n\n----------BOX-SET-PVAR----------\n\n"
+            (code-gen value major const_tab)
+            "MOV (R1, FPARG(2+"minor_str"))"
+            "MOV (IND(R1), R0);\n"
+            "MOV (R0, SOB_VOID);\n"
+            ))))
+            
+(define code-gen-box-set-bvar
+    (lambda (pe major const_tab)
+        (let* ((complete_var (cadr pe))
+                (minor (cadddr complete_var))
+                (major (caddr complete_var))
+                (value (caddr pe)) 
+                (minor_str (number->string minor))
+                (major_str (number->string major)))
+        (string-append
+            "\n\n----------BOX-SET-BVAR----------\n\n"
+            (code-gen value major const_tab)
+            "MOV (R1, FPARG(0));\n" ;env
+            "MOV (R1, INDD(R1,"major_str"));\n"	
+            "MOV (R2, INDD(R1,"minor_str"));\n"   		
+            "MOV (IND(R2), R0);\n"
+            "MOV (R0, SOB_VOID);\n"
+            ))))
+
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;MAIN-FLOW;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (define compile-scheme-file
 	(lambda (scm_src_file asm_target_file)
@@ -561,19 +600,12 @@
 			(string->file final_asm asm_target_file))))
 ;super_parsed_list)))
 
-;TODO - ONLY ONE S-EXP
 (define build_asm_insts_list
 	(lambda (super_parsed_list const_tab)
 		(if (null? super_parsed_list)
 			(list)
-			(cons (add_r0_print (code-gen (car super_parsed_list) 0 const_tab))
+			(cons (code-gen (car super_parsed_list) 0 const_tab)
 				  (build_asm_insts_list (cdr super_parsed_list) const_tab)))))
-
-;TODO - PROBABLY REMOVE
-(define add_r0_print
-	(lambda (asm_string)
-		;(string-append asm_string "OUT(IMM(2), R0);\n ")
-		asm_string))
 
 (define build_asm_insts_string
 	(lambda (insts_list)
@@ -586,44 +618,49 @@
 		(string-append (build_asm_constant_table constant_table)
 						asm_instructions_string)))
 
-(define build_asm_constant_table
-	(lambda (constant_table)
-		(let* ((last_element (car (reverse constant_table)))
-			   (address (car last_element))
-			   (represent (caddr last_element))
-		       (represent_length (length represent))
-		       (malloc_need (+ address represent_length))
-		       (malloc_need_str (number->string malloc_need)))
-			(string-append 
-				"PUSH ("malloc_need_str");\n"
-				"CALL (MALLOC);\n"
-				"DROP (1);\n"
-				(letrec ((run (lambda (lst)
-									(if (null? lst)
-										""	
-										 (let* ((element (car lst))
-										 	    (address (car element))
-										 	    (rep_lst (caddr element)))
-										 
-										 	(string-append (build_string_for_element_memory address rep_lst)
-										 	               (run (cdr lst))))))))
-					(run constant_table)))
-				
-			)))
+(define parsed_and_hw3 
+	(lambda (sexprs_list)
+		(if (null? sexprs_list)
+			(list)
+			(cons (annotate-tc
+				   	 (pe->lex-pe
+				   	   (box-set
+				   	      (remove-applic-lambda-nil
+				   	      	(eliminate-nested-defines 
+				   	      		(parse (car sexprs_list)))))))
+				   (parsed_and_hw3 (cdr sexprs_list))))))
 
-(define build_string_for_element_memory
-	(lambda (address rep_lst)
-		(letrec ((run (lambda (lst num)
-						(if (null? lst)
-							""
-							 (let ((string_rep (cond ((symbol? (car lst)) (symbol->string (car lst)))
-							 						 ((number? (car lst)) (number->string (car lst)))
-							 					  	 ((char? (car lst)) (number->string (char->integer (car lst))))
-							 					  	 (else ""))))
-							 	(string-append
-							 		"MOV (IND("(number->string num)"), "string_rep");\n"
-							 		(run (cdr lst) (+ num 1))))))))
-			(run rep_lst address))))
+(define create_sexprs_list
+	(lambda (scm_content)
+		(if (equal? scm_content "")
+			(list)
+			(let* ((match_and_remain (test-string <Sexpr> scm_content))
+				   (match (cadar match_and_remain))
+				   (remain (cadadr match_and_remain)))
+				(cons match (create_sexprs_list remain))))))
+
+
+
+(define file->string
+	(lambda (in-file)
+		(let ((in-port (open-input-file in-file)))
+			(letrec ((run
+						(lambda ()
+							(let ((ch (read-char in-port)))
+								(if (eof-object? ch)
+									(begin
+										(close-input-port in-port)
+										'())
+									(cons ch (run)))))))
+
+				(list->string (run))))))
+
+
+(define string->file
+	(lambda (string out-file)
+		(let ((out-port (open-output-file out-file)))
+			(begin (display string out-port)
+				   (close-output-port out-port)))))
 
 
 ; /* change to 0 for no debug info to be printed: */
@@ -693,6 +730,11 @@ return 0;
 						)))
 
 
+						
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;CONSTANT-TABLE;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;						
+						
 
 (define build_constant_table
 	(lambda (super_parsed_list)
@@ -823,52 +865,53 @@ return 0;
 			 	(if (equal? current_value element)
 			 		(car current)
 			 		(search_element element (cdr lst)))))))
+			 		
+(define build_asm_constant_table
+	(lambda (constant_table)
+		(let* ((last_element (car (reverse constant_table)))
+			   (address (car last_element))
+			   (represent (caddr last_element))
+		       (represent_length (length represent))
+		       (malloc_need (+ address represent_length))
+		       (malloc_need_str (number->string malloc_need)))
+			(string-append 
+				"PUSH ("malloc_need_str");\n"
+				"CALL (MALLOC);\n"
+				"DROP (1);\n"
+				(letrec ((run (lambda (lst)
+									(if (null? lst)
+										""	
+										 (let* ((element (car lst))
+										 	    (address (car element))
+										 	    (rep_lst (caddr element)))
+										 
+										 	(string-append (build_string_for_element_memory address rep_lst)
+										 	               (run (cdr lst))))))))
+					(run constant_table)))
+				
+			)))
 
-;TODO
+(define build_string_for_element_memory
+	(lambda (address rep_lst)
+		(letrec ((run (lambda (lst num)
+						(if (null? lst)
+							""
+							 (let ((string_rep (cond ((symbol? (car lst)) (symbol->string (car lst)))
+							 						 ((number? (car lst)) (number->string (car lst)))
+							 					  	 ((char? (car lst)) (number->string (char->integer (car lst))))
+							 					  	 (else ""))))
+							 	(string-append
+							 		"MOV (IND("(number->string num)"), "string_rep");\n"
+							 		(run (cdr lst) (+ num 1))))))))
+			(run rep_lst address))))
+
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;GLOBAL-TABLE;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;	
+			
 (define build_global_var_table
 	(lambda (super_parsed_list)
 		(list)))
 
-(define parsed_and_hw3 
-	(lambda (sexprs_list)
-		(if (null? sexprs_list)
-			(list)
-			(cons (annotate-tc
-				   	 (pe->lex-pe
-				   	   (box-set
-				   	      (remove-applic-lambda-nil
-				   	      	(eliminate-nested-defines 
-				   	      		(parse (car sexprs_list)))))))
-				   (parsed_and_hw3 (cdr sexprs_list))))))
 
-(define create_sexprs_list
-	(lambda (scm_content)
-		(if (equal? scm_content "")
-			(list)
-			(let* ((match_and_remain (test-string <Sexpr> scm_content))
-				   (match (cadar match_and_remain))
-				   (remain (cadadr match_and_remain)))
-				(cons match (create_sexprs_list remain))))))
-
-
-
-(define file->string
-	(lambda (in-file)
-		(let ((in-port (open-input-file in-file)))
-			(letrec ((run
-						(lambda ()
-							(let ((ch (read-char in-port)))
-								(if (eof-object? ch)
-									(begin
-										(close-input-port in-port)
-										'())
-									(cons ch (run)))))))
-
-				(list->string (run))))))
-
-
-(define string->file
-	(lambda (string out-file)
-		(let ((out-port (open-output-file out-file)))
-			(begin (display string out-port)
-				   (close-output-port out-port)))))
