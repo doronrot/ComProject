@@ -8,7 +8,7 @@
 (define count 0)
 
 (define code-gen
-	(lambda (pe major const_tab)
+	(lambda (pe major const_tab global_tab)
 		(cond 
 			  ((equal? pe `(const ,(void))) (code-gen-void))
               ((equal? pe `(const ())) (code-gen-nil))
@@ -16,23 +16,24 @@
 			  ((equal? pe `(const #t)) (code-gen-true))
 			  ((pair? pe)
                ;TODO: fvar, define ,box, set-fvar
-               (cond ((equal? (car pe) 'if3) (code-gen-if3 pe major const_tab))
-                     ((equal? (car pe) 'seq) (code-gen-seq pe major const_tab))
-                     ((equal? (car pe) 'or) (code-gen-or pe major const_tab))
+               (cond ((equal? (car pe) 'if3) (code-gen-if3 pe major const_tab global_tab))
+                     ((equal? (car pe) 'seq) (code-gen-seq pe major const_tab global_tab))
+                     ((equal? (car pe) 'or) (code-gen-or pe major const_tab global_tab))
                      ((equal? (car pe) 'const) (code-gen-const pe major const_tab))
-                     ((equal? (car pe) 'applic) (code-gen-applic pe major const_tab))
-                     ((equal? (car pe) 'tc-applic) (code-gen-tc-applic pe major const_tab))
-                     ((equal? (car pe) 'lambda-simple) (code-gen-lambda-simple pe major const_tab))
-                     ((equal? (car pe) 'lambda-opt) (code-gen-lambda-opt pe major const_tab))
-                     ((equal? (car pe) 'lambda-var) (code-gen-lambda-var pe major const_tab))
+                     ((equal? (car pe) 'applic) (code-gen-applic pe major const_tab global_tab))
+                     ((equal? (car pe) 'tc-applic) (code-gen-tc-applic pe major const_tab global_tab))
+                     ((equal? (car pe) 'lambda-simple) (code-gen-lambda-simple pe major const_tab global_tab))
+                     ((equal? (car pe) 'lambda-opt) (code-gen-lambda-opt pe major const_tab global_tab))
+                     ((equal? (car pe) 'lambda-var) (code-gen-lambda-var pe major const_tab global_tab))
                      ((equal? (car pe) 'pvar) (code-gen-pvar pe major))
                      ((equal? (car pe) 'bvar) (code-gen-bvar pe major))
-                     ((and (equal? (car pe) 'set) (equal? (caadr pe) 'pvar)) (code-gen-set-pvar pe major const_tab))
-                     ((and (equal? (car pe) 'set) (equal? (caadr pe) 'bvar)) (code-gen-set-bvar pe major const_tab))
-                     ((and (equal? (car pe) 'box-get) (equal? (caadr pe) 'pvar)) (code-gen-box-get-pvar pe major const_tab))
-                     ((and (equal? (car pe) 'box-get) (equal? (caadr pe) 'bvar)) (code-gen-box-get-bvar pe major const_tab))
-                     ((and (equal? (car pe) 'box-set) (equal? (caadr pe) 'pvar)) (code-gen-box-set-pvar pe major const_tab))
-                     ((and (equal? (car pe) 'box-set) (equal? (caadr pe) 'bvar)) (code-gen-box-set-bvar pe major const_tab))
+                     ((equal? (car pe) 'fvar) (code-gen-fvar pe major global_tab))
+                     ((and (equal? (car pe) 'set) (equal? (caadr pe) 'pvar)) (code-gen-set-pvar pe major const_tab global_tab))
+                     ((and (equal? (car pe) 'set) (equal? (caadr pe) 'bvar)) (code-gen-set-bvar pe major const_tab global_tab))
+                     ((and (equal? (car pe) 'box-get) (equal? (caadr pe) 'pvar)) (code-gen-box-get-pvar pe major))
+                     ((and (equal? (car pe) 'box-get) (equal? (caadr pe) 'bvar)) (code-gen-box-get-bvar pe major))
+                     ((and (equal? (car pe) 'box-set) (equal? (caadr pe) 'pvar)) (code-gen-box-set-pvar pe major const_tab global_tab))
+                     ((and (equal? (car pe) 'box-set) (equal? (caadr pe) 'bvar)) (code-gen-box-set-bvar pe major const_tab global_tab))
                      (else "")))
 			  (else "")))) 
 			  	
@@ -85,47 +86,47 @@
 	 	)))
 	 	
 (define code-gen-if3
-    (lambda (pe major const_tab)
+    (lambda (pe major const_tab global_tab)
         (set! count (+ count 1))
         (let ((test (cadr pe))
               (dit (caddr pe))
               (dif (cadddr pe))
               (count_str (number->string count)))
             (string-append   "\n\n//----------IF3----------//\n\n"
-                            (code-gen test major const_tab)
+                            (code-gen test major const_tab global_tab)
                             "CMP (R0, IMM(SOB_FALSE));\n"
                             "JUMP_EQ (L_if3_else_"count_str");\n"
-                            (code-gen dit major const_tab)
+                            (code-gen dit major const_tab global_tab)
                             "JUMP (L_if3_exit_"count_str");\n"
                             "L_if3_else_"count_str":\n"
-                            (code-gen dif major const_tab)
+                            (code-gen dif major const_tab global_tab)
                             "L_if3_exit_"count_str":\n"))))
                             
 (define code-gen-seq
-    (lambda (pe major const_tab)
+    (lambda (pe major const_tab global_tab)
         (let ((seq_body (cadr pe)))
             (letrec ((run (lambda (lst)
                                 (if (null? lst)
                                     ""
-                                    (string-append (code-gen (car lst) major const_tab)
+                                    (string-append (code-gen (car lst) major const_tab global_tab)
                                                    (run (cdr lst)))))))
 			   	 	(string-append "\n\n//----------SEQ----------//\n\n"
                                     (run seq_body))))))
                                     
 (define code-gen-or
-    (lambda (pe major const_tab)
+    (lambda (pe major const_tab global_tab)
         (set! count (+ count 1))
         (let ((or_exps (cadr pe))
               (count_str (number->string count)))
             (letrec ((run (lambda (lst)
                                 (if (equal? (length lst) 1)
-                                    (string-append (code-gen (car lst) major const_tab)
+                                    (string-append (code-gen (car lst) major const_tab global_tab)
                                                 "L_or_exit_"count_str":\n"
                                                 ; "PUSH (R0);\n"
                                                 ; "CALL (WRITE_SOB);\n"
                                                 ; "DROP (1);\n"
                                                 )
-                                    (string-append (code-gen (car lst) major const_tab)
+                                    (string-append (code-gen (car lst) major const_tab global_tab)
                                                 "CMP (R0, IMM(SOB_FALSE));\n"
                                                 "JUMP_NE (L_or_exit_"count_str");\n"
                                                 (run (cdr lst)))))))
@@ -142,7 +143,7 @@
             )))
                                     
 (define code-gen-applic
-    (lambda (pe major const_tab)
+    (lambda (pe major const_tab global_tab)
         (set! count (+ count 1))
         (let* ((proc (cadr pe))
                 (args (caddr pe))
@@ -153,7 +154,7 @@
 			  						 (if (null? lst)
 			  						 	 (string-append 
 			  						 	   "PUSH ("args_count_str");\n"
-  						 				   (code-gen proc major const_tab)
+  						 				   (code-gen proc major const_tab global_tab)
   						 				   "CMP (INDD(R0, 0), IMM(T_CLOSURE));\n"
   						 				   "JUMP_NE (L_error_cannot_apply_non_clos_"count_str");\n"
   						 				   "PUSH (INDD(R0, 1));\n"
@@ -167,7 +168,7 @@
   						 				   "L_error_cannot_apply_non_clos_"count_str":\n"
   						 				   "L_applic_exit_"count_str":\n")
 			  						 	 (string-append 
-			  						 	   (code-gen (car lst) major const_tab)
+			  						 	   (code-gen (car lst) major const_tab global_tab)
   						 				   "PUSH (R0);\n"
   						 				   (run (cdr lst)))))))
 			  			(string-append
@@ -176,7 +177,7 @@
 								(run (reverse args)))))))
 ;TODO: FIX THE STACK FIX!
 (define code-gen-tc-applic
-    (lambda (pe major const_tab)
+    (lambda (pe major const_tab global_tab)
         (set! count (+ count 1))
         (let* ((proc (cadr pe))
                 (args (caddr pe))
@@ -187,7 +188,7 @@
 			  						 (if (null? lst)
 			  						 	 (string-append 
 			  						 	   "PUSH ("args_count_str");\n"
-  						 				   (code-gen proc major const_tab)
+  						 				   (code-gen proc major const_tab global_tab)
   						 				   "CMP (INDD(R0, 0),IMM(T_CLOSURE));\n"
   						 				   "JUMP_NE (L_error_cannot_apply_non_clos_"count_str");\n"
   						 				   "PUSH (INDD(R0, 1));\n"
@@ -214,7 +215,7 @@
   						 				   "")
 
 			  						 	 (string-append 
-			  						 	   (code-gen (car lst) major const_tab)
+			  						 	   (code-gen (car lst) major const_tab global_tab)
   						 				   "PUSH (R0);\n"
   						 				   (run (cdr lst) (+ counter_up 1)))))))
 			  		(string-append
@@ -222,7 +223,7 @@
                                 (run (reverse args) 3))))))
 
 (define code-gen-lambda-simple
-    (lambda (pe major const_tab)
+    (lambda (pe major const_tab global_tab)
         (set! count (+ count 1))
         (let* (
                 (params (cadr pe))
@@ -283,7 +284,7 @@
 
             "CMP (FPARG(1), IMM("num_params_str"));\n"
             "JUMP_NE (L_error_lambda_args_count_"count_str");\n"
-            (code-gen body (+ major 1) const_tab)
+            (code-gen body (+ major 1) const_tab global_tab)
             "JUMP (L_clos_ok_"count_str");\n"
             "L_error_lambda_args_count_"count_str":\n"
             "L_clos_ok_"count_str":\n"
@@ -293,7 +294,7 @@
             ))))
 
 (define code-gen-lambda-opt
-    (lambda (pe major const_tab)
+    (lambda (pe major const_tab global_tab)
         (set! count (+ count 1))
         (let* (
                 (must_params (cadr pe))
@@ -374,7 +375,7 @@
 
             "CMP (FPARG(1), IMM("optional_params_str"));\n"
             "JUMP_NE (L_error_lambda_args_count_"count_str");\n"
-            (code-gen body (+ major 1) const_tab)
+            (code-gen body (+ major 1) const_tab global_tab)
             "JUMP (L_clos_ok_"count_str");\n"
             "L_error_lambda_args_count_"count_str":\n"
             "L_clos_ok_"count_str":\n"
@@ -385,7 +386,7 @@
             
             
 (define code-gen-lambda-var 
-    (lambda (pe major const_tab)
+    (lambda (pe major const_tab global_tab)
         (set! count (+ count 1))
         (let* (
                 (optional_params 1)
@@ -463,7 +464,7 @@
 
             "CMP (FPARG(1), IMM("optional_params_str"));\n"
             "JUMP_NE (L_error_lambda_args_count_"count_str");\n"
-            (code-gen body (+ major 1) const_tab)
+            (code-gen body (+ major 1) const_tab global_tab)
             "JUMP (L_clos_ok_"count_str");\n"
             "L_error_lambda_args_count_"count_str":\n"
             "L_clos_ok_"count_str":\n"
@@ -492,22 +493,32 @@
             "MOV (R0, FPARG(0));\n" ;env
             "MOV (R0, INDD(R0," major_str"));\n"	   		
             "MOV (R0, INDD(R0," minor_str"));\n"))))
+
+(define code-gen-fvar
+    (lambda (pe major global_tab)
+        (let* ((var_name (cadr pe))
+               (address (fvar_get_address_by_name var_name global_tab)))
+            (string-append
+                "\n\n//----------FVAR----------//\n\n"
+                "MOV (R0, IND("(number->string address)"));\n"))))
+
+
             
 (define code-gen-set-pvar
-    (lambda (pe major const_tab)
+    (lambda (pe major const_tab global_tab)
         (let* ((complete_var (cadr pe))
                 (minor (caddr complete_var))
                 (value (caddr pe)) 
                 (minor_str (number->string minor)))
         (string-append
             "\n\n//----------SET-PVAR----------//\n\n"
-            (code-gen value major const_tab)
+            (code-gen value major const_tab global_tab)
             "MOV (FPARG(2+"minor_str"), R0);\n"
             "MOV (R0, SOB_VOID);\n" 
             ))))
             
 (define code-gen-set-pvar
-    (lambda (pe major const_tab)
+    (lambda (pe major const_tab global_tab)
         (let* ((complete_var (cadr pe))
                 (minor (cadddr complete_var))
                 (major (caddr complete_var))
@@ -516,7 +527,7 @@
                 (major_str (number->string major)))
         (string-append
             "\n\n//----------SET-BVAR----------//\n\n"
-            (code-gen value major const_tab)
+            (code-gen value major const_tab global_tab)
             "MOV (R1, FPARG(0));\n" ;env
             "MOV (R1, INDD(R1," major_str"));\n"	   		
             "MOV (INDD(R1," minor_str"), R0);\n"
@@ -524,7 +535,7 @@
             ))))
 
 (define code-gen-box-get-pvar
-    (lambda (pe major const_tab)
+    (lambda (pe major)
         (let* ((complete_var (cadr pe))
                 (minor (caddr complete_var))
                 (minor_str (number->string minor)))
@@ -535,7 +546,7 @@
             ))))
             
 (define code-gen-box-get-bvar
-    (lambda (pe major const_tab)
+    (lambda (pe major)
 			   (let* ((complete_var (cadr pe))
 			   		  (minor (cadddr complete_var))
 			   		  (major (caddr complete_var))
@@ -550,21 +561,21 @@
 			   		))))
 			   		
 (define code-gen-box-set-pvar
-    (lambda (pe major const_tab)
+    (lambda (pe major const_tab global_tab)
         (let* ((complete_var (cadr pe))
                 (minor (caddr complete_var))
                 (value (caddr pe)) 
                 (minor_str (number->string minor)))
         (string-append
             "\n\n//----------BOX-SET-PVAR----------//\n\n"
-            (code-gen value major const_tab)
+            (code-gen value major const_tab global_tab)
             "MOV (R1, FPARG(2+"minor_str"))"
             "MOV (IND(R1), R0);\n"
             "MOV (R0, SOB_VOID);\n"
             ))))
             
 (define code-gen-box-set-bvar
-    (lambda (pe major const_tab)
+    (lambda (pe major const_tab global_tab)
         (let* ((complete_var (cadr pe))
                 (minor (cadddr complete_var))
                 (major (caddr complete_var))
@@ -573,7 +584,7 @@
                 (major_str (number->string major)))
         (string-append
             "\n\n//----------BOX-SET-BVAR----------//\n\n"
-            (code-gen value major const_tab)
+            (code-gen value major const_tab global_tab)
             "MOV (R1, FPARG(0));\n" ;env
             "MOV (R1, INDD(R1,"major_str"));\n"	
             "MOV (R2, INDD(R1,"minor_str"));\n"   		
@@ -594,7 +605,7 @@
 			   (super_parsed_list (parsed_and_hw3 sexprs_list))
 			   (constant_table (build_constant_table super_parsed_list))
 			   (global_var_table (build_global_var_table super_parsed_list (find_next_available_address constant_table)))
-			   (asm_instructions_list (build_asm_insts_list super_parsed_list constant_table))
+			   (asm_instructions_list (build_asm_insts_list super_parsed_list constant_table global_var_table))
 			   (asm_instructions_string (build_asm_insts_string asm_instructions_list))
 			   (asm_with_const_global_table (add_const_global_table constant_table global_var_table asm_instructions_string))
 			   (final_asm (add_prologue_epilgue asm_with_const_global_table)))
@@ -602,11 +613,11 @@
 ;global_var_table)))
 
 (define build_asm_insts_list
-	(lambda (super_parsed_list const_tab)
+	(lambda (super_parsed_list const_tab global_tab)
 		(if (null? super_parsed_list)
 			(list)
-			(cons (code-gen (car super_parsed_list) 0 const_tab)
-				  (build_asm_insts_list (cdr super_parsed_list) const_tab)))))
+			(cons (code-gen (car super_parsed_list) 0 const_tab global_tab)
+				  (build_asm_insts_list (cdr super_parsed_list) const_tab global_tab)))))
 
 (define build_asm_insts_string
 	(lambda (insts_list)
@@ -975,6 +986,17 @@ return 0;
                 ;     (run global_table))) 
                 )
             )))
+
+(define fvar_get_address_by_name
+    (lambda (name global_table)
+        (if (null? global_table)
+            0
+             (let* ((element (car global_table))
+                    (element_name (car element)))
+                (if (equal? name element_name)
+                    (cadr element)
+                    (fvar_get_address_by_name name (cdr global_table)))))))
+
 
 
 ; (define build_string_for_global_element_memory
