@@ -125,3 +125,5 @@
             "MOV(INDD(R0, 2), LABEL(L_string_symbol_body)); \n"
             "MOV(IND(" (number->string (fvar_get_address_by_name 'string->symbol global_var_table)) "), R0);\n")))
 
+
+
