@@ -8,7 +8,12 @@
  WRITE_SOB_SYMBOL:
   PUSH(FP);
   MOV(FP, SP);
-
+  PUSH(R1);
+  PUSH(R2);
+  PUSH(R3);
+  PUSH(R4);
+  PUSH(R5);
+  
   MOV(R4, FPARG(0));
   MOV(R5, INDD(R4, 1));
 
@@ -107,6 +112,11 @@
   JUMP(L_SYM_LOOP); 
  L_SYM_EXIT:
 
+  POP(R5);
+  POP(R4);
+  POP(R3);
+  POP(R2);
+  POP(R1);
 
   POP(FP);
   RETURN;
