@@ -802,3 +802,247 @@
             "MOV(INDD(R0, 1), IMM(12345678)); \n"
             "MOV(INDD(R0, 2), LABEL(L_vector_length_Body)); \n"
             "MOV(IND(" (number->string (fvar_get_address_by_name 'vector-length global_var_table)) "), R0);\n")))
+
+; assuming that ref is in str-len bounds
+(define asm_string_ref
+  (lambda (global_var_table)
+    (string-append
+        "JUMP(Lmake_string_ref_Clos); \n"
+        "L_string_ref_Body: \n"
+            "PUSH(FP); \n"
+            "MOV(FP, SP); \n"
+            "CMP(FPARG(1), IMM(2)); \n"
+            "JUMP_NE(L_string_ref_End);\n"     ;incorr args num
+            "MOV(R1, FPARG(2)); \n"     ;R1<-string
+            "CMP(INDD(R1,0),IMM(T_STRING)); \n" 
+            "JUMP_NE(L_string_ref_End);\n"   ;not a string type
+            "MOV(R2,FPARG(3)); \n"  ;R2<-index 
+            "MOV (R2, INDD(R2, 1));\n"
+            "MOV(R3,INDD(R1,2+R2));\n"
+            "PUSH(R3);\n"
+            "CALL(MAKE_SOB_CHAR);\n"
+            "DROP (1);\n"     ;R0<-str[i] (in shape of sob_char)
+        "L_string_ref_End: \n"
+            "POP(FP); \n"
+            "RETURN; \n\n"
+        
+        "Lmake_string_ref_Clos: \n"
+            "PUSH(IMM(3)); \n"
+            "CALL(MALLOC); \n"
+            "DROP(1); \n"
+            "MOV(INDD(R0, 0), IMM(T_CLOSURE)); \n"
+            "MOV(INDD(R0, 1), IMM(12345678)); \n"
+            "MOV(INDD(R0, 2), LABEL(L_string_ref_Body)); \n"
+            "MOV(IND(" (number->string (fvar_get_address_by_name 'string-ref global_var_table)) "), R0);\n")))
+
+; assuming that ref is in vector-len bounds
+(define asm_vector_ref
+  (lambda (global_var_table)
+    (string-append
+        "JUMP(Lmake_vector_ref_Clos); \n"
+        "L_vector_ref_Body: \n"
+            "PUSH(FP); \n"
+            "MOV(FP, SP); \n"
+            "CMP(FPARG(1), IMM(2)); \n"
+            "JUMP_NE(L_vector_ref_End);\n"     ;incorr args num
+            "MOV(R1, FPARG(2)); \n"     ;R1<-vector
+            "CMP(INDD(R1,0),IMM(T_VECTOR)); \n" 
+            "JUMP_NE(L_vector_ref_End);\n"   ;not a vector type
+            "MOV(R2,INDD(FPARG(3),1)); \n"  ;R2<-index 
+            "MOV(R3,INDD(R1,2+R2));\n"  ;R3<-ref_to_Element
+            "MOV(R0,R3);\n"
+        "L_vector_ref_End: \n"
+            "POP(FP); \n"
+            "RETURN; \n\n"
+        
+        "Lmake_vector_ref_Clos: \n"
+            "PUSH(IMM(3)); \n"
+            "CALL(MALLOC); \n"
+            "DROP(1); \n"
+            "MOV(INDD(R0, 0), IMM(T_CLOSURE)); \n"
+            "MOV(INDD(R0, 1), IMM(12345678)); \n"
+            "MOV(INDD(R0, 2), LABEL(L_vector_ref_Body)); \n"
+            "MOV(IND(" (number->string (fvar_get_address_by_name 'vector-ref global_var_table)) "), R0);\n")))
+
+;sending params to make_sob_string: chars and length
+(define asm_make_string
+  (lambda (global_var_table)
+    (string-append
+        " JUMP(Lmake_make_string_Clos); \n"
+        "L_make_string_Body: \n"
+            " PUSH(FP); \n"
+            " MOV(FP, SP); \n"
+            " CMP(FPARG(1), IMM(1)); \n"
+            " JUMP_LT(L_make_string_End);\n"     ;incorr args num
+            " CMP(FPARG(1), IMM(2)); \n"
+            " JUMP_GT(L_make_string_End);\n"     ;incorr args num
+            " MOV(R3,INDD(FPARG(2),1));\n"  ;R3<-length
+            " MOV(R4,R3);\n"    ;length to push before calling make_sob_string
+            " MOV(R2,0);\n"   ;TODO------->\000
+            " CMP(FPARG(1), IMM(2)); \n"
+            " JUMP_NE(L_make_string_Loop);\n"     ;fill with \000's
+            " MOV(R1, FPARG(3)); \n"    ;else: char was given
+            " CMP(IND(R1),T_CHAR); \n" 
+            " JUMP_NE(L_make_string_End);\n" ;not a char
+            " MOV(R2, INDD(R1,1)); \n"   ;R2<-the specified char //overloading \000
+        "L_make_string_Loop: \n"
+            " CMP(R3,IMM(0));\n"
+            " JUMP_EQ(L_make_Sob_String);\n"
+            " PUSH(R2);\n"
+            " SUB(R3,IMM(1));\n"
+            " JUMP(L_make_string_Loop);\n"  
+        "L_make_Sob_String: \n"
+            " PUSH(R4);\n"
+            " CALL(MAKE_SOB_STRING);\n"
+            " DROP(1);\n" 
+            " DROP (R4);\n" 
+        "L_make_string_End: \n"
+            " POP(FP); \n"
+            " RETURN; \n\n"
+
+        "Lmake_make_string_Clos: \n"
+            "PUSH(IMM(3)); \n"
+            "CALL(MALLOC); \n"
+            "DROP(1); \n"
+            "MOV(INDD(R0, 0), IMM(T_CLOSURE)); \n"
+            "MOV(INDD(R0, 1), IMM(12345678)); \n"
+            "MOV(INDD(R0, 2), LABEL(L_make_string_Body)); \n"
+            "MOV(IND(" (number->string (fvar_get_address_by_name 'make-string global_var_table)) "), R0);\n")))
+
+
+
+;sending params to make_sob_vector: some_type and length
+(define asm_make_vector
+  (lambda (global_var_table)
+    (string-append
+        " JUMP(Lmake_make_vector_Clos); \n"
+        "L_make_vector_Body: \n"
+            " PUSH(FP); \n"
+            " MOV(FP, SP); \n"
+            " CMP(FPARG(1), IMM(1)); \n"
+            " JUMP_LT(L_make_vector_End);\n"     ;incorr args num
+            " CMP(FPARG(1), IMM(2)); \n"
+            " JUMP_GT(L_make_vector_End);\n"     ;incorr args num
+            " MOV(R3,INDD(FPARG(2),1));\n"  ;R3<-length
+            " MOV(R4,R3);\n"    ;length to push before calling make_sob_vector
+            " MOV(R1,0);\n"   ;TODO------->\000
+            " CMP(FPARG(1), IMM(2)); \n"
+            " JUMP_NE(L_make_vector_Loop);\n"     ;fill with \000's
+            " MOV(R1, FPARG(3)); \n"    ;R1<-some_type
+        "L_make_vector_Loop: \n"
+            " CMP(R3,IMM(0));\n"
+            " JUMP_EQ(L_make_Sob_Vector);\n"
+            " PUSH(R1);\n"
+            " SUB(R3,IMM(1));\n"
+            " JUMP(L_make_vector_Loop);\n"  
+        "L_make_Sob_Vector: \n"
+            " PUSH(R4);\n"
+            " CALL(MAKE_SOB_VECTOR);\n"
+            " DROP(1);\n"
+            " DROP (R4);\n"
+        "L_make_vector_End: \n"
+            " POP(FP); \n"
+            " RETURN; \n\n"
+
+        "Lmake_make_vector_Clos: \n"
+            "PUSH(IMM(3)); \n"
+            "CALL(MALLOC); \n"
+            "DROP(1); \n"
+            "MOV(INDD(R0, 0), IMM(T_CLOSURE)); \n"
+            "MOV(INDD(R0, 1), IMM(12345678)); \n"
+            "MOV(INDD(R0, 2), LABEL(L_make_vector_Body)); \n"
+            "MOV(IND(" (number->string (fvar_get_address_by_name 'make-vector global_var_table)) "), R0);\n")))
+
+
+
+(define asm_vector
+  (lambda (global_var_table)
+    (string-append
+        " JUMP(Lmake_vector_Clos); \n"
+        "L_vector_Body: \n"
+            " PUSH(FP); \n"
+            " MOV(FP, SP); \n"
+            " MOV(R3,FPARG(1));\n" ;num of args
+            " MOV(R4,IMM(0));\n"    ;counter
+        "L_vector_Loop: \n"
+            " CMP(R4,R3);\n"
+            " JUMP_EQ(L_make_Sob_Vector);\n"
+            " MOV(R1, FPARG(2+R4));\n"
+            " PUSH(R1);\n"
+            " ADD(R4,IMM(1));\n"
+            " JUMP(L_vector_Loop);\n" 
+        "L_make_Sob_Vector: \n"
+            " PUSH(R3);\n"
+            " CALL(MAKE_SOB_VECTOR);\n"
+            " DROP(1);\n" 
+            " DROP(R3);\n"
+        "L_vector_End: \n"
+            " POP(FP); \n"
+            " RETURN; \n\n"
+
+        "Lmake_vector_Clos: \n"
+            "PUSH(IMM(3)); \n"
+            "CALL(MALLOC); \n"
+            "DROP(1); \n"
+            "MOV(INDD(R0, 0), IMM(T_CLOSURE)); \n"
+            "MOV(INDD(R0, 1), IMM(12345678)); \n"
+            "MOV(INDD(R0, 2), LABEL(L_vector_Body)); \n"
+            "MOV(IND(" (number->string (fvar_get_address_by_name 'vector global_var_table)) "), R0);\n")))
+
+
+(define asm_string_set
+  (lambda (global_var_table)
+    (string-append
+        " JUMP(Lmake_string_set_Clos); \n"
+        "L_string_set_Body: \n"
+            " PUSH(FP); \n"
+            " MOV(FP, SP); \n"
+            " CMP(FPARG(1), IMM(3)); \n"
+            " JUMP_NE(L_string_set_End);\n"     ;incorr args num
+            " MOV(R2,FPARG(2));\n"       ;R2<-str
+            " MOV(R3,INDD(FPARG(3),1));\n"  ;R3<-index to set
+            " MOV(R4,INDD(FPARG(4),1));\n"  ;R4<-new char
+            " MOV(INDD(R2,2+R3),R4);\n"     ;put the new char in the wanted index
+            " MOV(R0, IMM(SOB_VOID));\n"
+        "L_string_set_End: \n"
+            " POP(FP); \n"
+            " RETURN; \n\n"
+
+        "Lmake_string_set_Clos: \n"
+            "PUSH(IMM(3)); \n"
+            "CALL(MALLOC); \n"
+            "DROP(1); \n"
+            "MOV(INDD(R0, 0), IMM(T_CLOSURE)); \n"
+            "MOV(INDD(R0, 1), IMM(12345678)); \n"
+            "MOV(INDD(R0, 2), LABEL(L_string_set_Body)); \n"
+            "MOV(IND(" (number->string (fvar_get_address_by_name 'string-set! global_var_table)) "), R0);\n")))
+
+
+(define asm_vector_set
+  (lambda (global_var_table)
+    (string-append
+        " JUMP(Lmake_vector_set_Clos); \n"
+        "L_vector_set_Body: \n"
+            " PUSH(FP); \n"
+            " MOV(FP, SP); \n"
+            " CMP(FPARG(1), IMM(3)); \n"
+            " JUMP_NE(L_vector_set_End);\n"     ;incorr args num
+            " MOV(R2,FPARG(2));\n"       ;R2<-vector
+            " MOV(R3,INDD(FPARG(3),1));\n"  ;R3<-index to set
+            " MOV(R4,FPARG(4));\n"  ;R4<-new type
+            " MOV(INDD(R2,2+R3),R4);\n"     ;put the new type in the wanted index
+            " MOV(R0, IMM(SOB_VOID));\n"
+        "L_vector_set_End: \n"
+            " POP(FP); \n"
+            " RETURN; \n\n"
+
+        "Lmake_vector_set_Clos: \n"
+            "PUSH(IMM(3)); \n"
+            "CALL(MALLOC); \n"
+            "DROP(1); \n"
+            "MOV(INDD(R0, 0), IMM(T_CLOSURE)); \n"
+            "MOV(INDD(R0, 1), IMM(12345678)); \n"
+            "MOV(INDD(R0, 2), LABEL(L_vector_set_Body)); \n"
+            "MOV(IND(" (number->string (fvar_get_address_by_name 'vector-set! global_var_table)) "), R0);\n")))
+
+
