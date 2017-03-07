@@ -383,7 +383,7 @@
 
             ;FIX STACK:
             "MOV (R1, SOB_NIL);\n"
-            "ADD (R6, IMM(FPARG(1)));\n"
+            "MOV (R6, IMM(FPARG(1)));\n"
             "L_clos_fix_stack_loop_"count_str":\n"
             "CMP (R6, "num_must_params_str");\n"
             "JUMP_LE (L_clos_fix_stack_out_"count_str");\n"
@@ -472,7 +472,7 @@
 
             ;FIX STACK:
             "MOV (R1, SOB_NIL);\n"
-            "ADD (R6, IMM(FPARG(1)));\n"
+            "MOV (R6, IMM(FPARG(1)));\n"
             "L_clos_fix_stack_loop_"count_str":\n"
             "CMP (R6, 0);\n"
             "JUMP_LE (L_clos_fix_stack_out_"count_str");\n"
@@ -676,7 +676,7 @@
     (lambda (constant_table global_var_table string_table asm_instructions_string)
         (string-append (build_asm_constant_table constant_table)
                        (build_asm_global_table global_var_table (find_next_available_address constant_table))
-                       (build_asm_string_table string_table (find_next_available_address_after_global global_var_table constant_table))
+                       ;(build_asm_string_table string_table (find_next_available_address_after_global global_var_table constant_table))
                         asm_instructions_string)))
 
 (define parsed_and_hw3 
@@ -1217,11 +1217,11 @@ return 0;
             "MOV(R3,IMM(0));\n"   ; R3: acc
         "LPlusLoop: \n"
            "CMP (R2,R1);\n"
-           "JUMP_EQ(LPlusEnd); \n"
+           "JUMP_EQ(LPlusEXIT); \n"
            "ADD(R3,INDD(FPARG(2+R2),1));\n"
            "ADD(R2,IMM(1));\n"
            "JUMP (LPlusLoop);\n"
-        "LPlusEnd: \n"
+        "LPlusEXIT: \n"
            "PUSH (R3);\n"
            "CALL (MAKE_SOB_INTEGER);\n"
            "DROP(1);\n"
@@ -1254,18 +1254,18 @@ return 0;
             "JUMP_EQ(LMinusOneParam);\n"    
         "LMinusLoop: \n"
            "CMP (R2,R1);\n"
-           "JUMP_EQ(LMinusEnd); \n"
+           "JUMP_EQ(LMinusEXIT); \n"
            "SUB(R3,INDD(FPARG(2+R2),1));\n"
            "ADD(R2,IMM(1));\n"
            "JUMP (LMinusLoop);\n"
         "LMinusZeroParams: \n"
             "MOV(R3,IMM(0));\n"
-           "JUMP_EQ(LMinusEnd); \n"
+           "JUMP_EQ(LMinusEXIT); \n"
         "LMinusOneParam: \n"
             "MOV(R4,R3);\n"
             "ADD(R4,R4);\n"
             "SUB(R3,R4);\n "
-        "LMinusEnd: \n"
+        "LMinusEXIT: \n"
            "PUSH (R3);\n"
            "CALL (MAKE_SOB_INTEGER);\n"
            "DROP(1);\n"
@@ -1296,11 +1296,11 @@ return 0;
             "MOV(R3,INDD(FPARG(2),1));\n"   ; R3: acc (first param)
         "LMultiplyLoop: \n"
            "CMP (R2,R1);\n"
-           "JUMP_EQ(LMultiplyEnd); \n"
+           "JUMP_EQ(LMultiplyEXIT); \n"
            "MUL(R3,INDD(FPARG(2+R2),1));\n"
            "ADD(R2,IMM(1));\n"
            "JUMP (LMultiplyLoop);\n"
-        "LMultiplyEnd: \n"
+        "LMultiplyEXIT: \n"
            "PUSH (R3);\n"
            "CALL (MAKE_SOB_INTEGER);\n"
            "DROP(1);\n"
@@ -1332,11 +1332,11 @@ return 0;
             "MOV(R3,INDD(FPARG(2),1));\n"   ; R3: acc (first param)
         "LDivLoop: \n"
            "CMP (R2,R1);\n"
-           "JUMP_EQ(LDivEnd); \n"
+           "JUMP_EQ(LDivEXIT); \n"
            "DIV(R3,INDD(FPARG(2+R2),1));\n"
            "ADD(R2,IMM(1));\n"
            "JUMP (LDivLoop);\n"
-        "LDivEnd: \n"
+        "LDivEXIT: \n"
            "PUSH (R3);\n"
            "CALL (MAKE_SOB_INTEGER);\n"
            "DROP(1);\n"
@@ -1363,16 +1363,16 @@ return 0;
             "PUSH(FP); \n"
             "MOV(FP, SP); \n"
             "CMP(FPARG(1), IMM(2)); \n"
-            "JUMP_NE(LSmallerThan_End);\n"  ;error agrs num
+            "JUMP_NE(LSmallerThan_EXIT);\n"  ;error agrs num
             "MOV(R1, INDD(FPARG(2),1)); \n"
             "MOV(R2, INDD(FPARG(3),1)); \n"
             "CMP(R1, R2); \n"
             "JUMP_LT(LSmallerThan); \n"
             "MOV(R0,SOB_FALSE); \n"     ;else
-            "JUMP(LSmallerThan_End); \n"
+            "JUMP(LSmallerThan_EXIT); \n"
         "LSmallerThan: \n"
             "MOV(R0,SOB_TRUE);\n"
-        "LSmallerThan_End: \n"
+        "LSmallerThan_EXIT: \n"
             "POP(FP); \n"
             "RETURN; \n \n"
         
@@ -1898,13 +1898,13 @@ return 0;
             "PUSH(FP); \n"
             "MOV(FP, SP); \n"
             "CMP(FPARG(1), IMM(1)); \n"
-            "JUMP_NE(L_vector_length_End);\n"     ;incorr args num
+            "JUMP_NE(L_vector_length_EXIT);\n"     ;incorr args num
             "MOV(R1, FPARG(2)); \n" 
             "CMP(INDD(R1,0),IMM(T_VECTOR)); \n" 
-            "JUMP_NE(L_vector_length_End);\n"   ;not a vector
+            "JUMP_NE(L_vector_length_EXIT);\n"   ;not a vector
             "MOV(R2,INDD(FPARG(2),1));\n"
             "MOV(R0,R2);\n"     ;R0<-vec_len
-        "L_vector_length_End: \n"
+        "L_vector_length_EXIT: \n"
             "POP(FP); \n"
             "RETURN; \n\n"
         
