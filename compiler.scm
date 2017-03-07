@@ -769,13 +769,13 @@ MOV(FP, SP);
 "\n\n//----------PRINT----------//\n\n"
 
 "
-//CMP(R0, SOB_VOID);
-//JUMP_EQ(DONT_PRINT);
+CMP(R0, SOB_VOID);
+JUMP_EQ(DONT_PRINT);
 PUSH(R0);
 CALL(WRITE_SOB);
 DROP(1);
 OUT(2,10);
-//DONT_PRINT:
+DONT_PRINT:
 
 POP(FP);
 
@@ -1557,7 +1557,7 @@ return 0;
             "CALL(IS_SOB_CHAR);\n"
             "DROP(1);\n"
             "CMP(R0, IMM(1)); \n"
-            "JUMP_E(L_isChar); \n"
+            "JUMP_EQ(L_isChar); \n"
             "MOV(R0,SOB_FALSE); \n"     ;else
             "JUMP(L_char_End); \n"
         "L_isChar: \n"
@@ -1863,31 +1863,56 @@ return 0;
             "MOV(INDD(R0, 2), LABEL(L_symbol_Body)); \n"
             "MOV(IND(" (number->string (fvar_get_address_by_name 'symbol? global_var_table)) "), R0);\n")))
 
-
-
-; ;;;;; unfinished
-; (define asm_string_length
-;   (lambda (global_var_table)
-;     (string-append
-;         "JUMP(Lmake-string-length-Clos); \n"
-;         "L-string-length-Body: \n"
-;             "PUSH(FP); \n"
-;             "MOV(FP, SP); \n"
-;             "CMP(FPARG(1), IMM(1)); \n"
-;             "JUMP_NE(L-string-length-End);\n"     ;incorr args num
-;             "PUSH(FPARG(2));\n"
-;             "CALL(strlen);\n"
-;             "DROP(1);\n"
-
-;         "L-string-length-End: \n"
-;             "POP(FP); \n"
-;             "RETURN; \n\n"
+(define asm_string_length
+  (lambda (global_var_table)
+    (string-append
+        "JUMP(Lmake_string_length_Clos); \n"
+        "L_string_length_Body: \n"
+            "PUSH(FP); \n"
+            "MOV(FP, SP); \n"
+            "CMP(FPARG(1), IMM(1)); \n"
+            "JUMP_NE(L_string_length_End);\n"     ;incorr args num
+            "MOV(R1, FPARG(2)); \n" 
+            "CMP(INDD(R1,0),IMM(T_STRING)); \n" 
+            "JUMP_NE(L_string_length_End);\n"   ;not a string
+            "MOV(R2,INDD(FPARG(2),1));\n"
+            "MOV(R0,R2);\n"     ;R0<_strlen
+        "L_string_length_End: \n"
+            "POP(FP); \n"
+            "RETURN; \n\n"
         
-;         "Lmake-string-length-Clos: \n"
-;             "PUSH(IMM(3)); \n"
-;             "CALL(MALLOC); \n"
-;             "DROP(1); \n"
-;             "MOV(INDD(R0, 0), IMM(T_CLOSURE)); \n"
-;             "MOV(INDD(R0, 1), IMM(12345678)); \n"
-;             "MOV(INDD(R0, 2), LABEL(L-string-length-Body)); \n"
-;             "MOV(IND(" (number->string (fvar_get_address_by_name 'string-length global_var_table)) "), R0);\n")))
+        "Lmake_string_length_Clos: \n"
+            "PUSH(IMM(3)); \n"
+            "CALL(MALLOC); \n"
+            "DROP(1); \n"
+            "MOV(INDD(R0, 0), IMM(T_CLOSURE)); \n"
+            "MOV(INDD(R0, 1), IMM(12345678)); \n"
+            "MOV(INDD(R0, 2), LABEL(L_string_length_Body)); \n"
+            "MOV(IND(" (number->string (fvar_get_address_by_name 'string-length global_var_table)) "), R0);\n")))
+
+(define asm_vector_length
+  (lambda (global_var_table)
+    (string-append
+        "JUMP(Lmake_vector_length_Clos); \n"
+        "L_vector_length_Body: \n"
+            "PUSH(FP); \n"
+            "MOV(FP, SP); \n"
+            "CMP(FPARG(1), IMM(1)); \n"
+            "JUMP_NE(L_vector_length_End);\n"     ;incorr args num
+            "MOV(R1, FPARG(2)); \n" 
+            "CMP(INDD(R1,0),IMM(T_VECTOR)); \n" 
+            "JUMP_NE(L_vector_length_End);\n"   ;not a vector
+            "MOV(R2,INDD(FPARG(2),1));\n"
+            "MOV(R0,R2);\n"     ;R0<-vec_len
+        "L_vector_length_End: \n"
+            "POP(FP); \n"
+            "RETURN; \n\n"
+        
+        "Lmake_vector_length_Clos: \n"
+            "PUSH(IMM(3)); \n"
+            "CALL(MALLOC); \n"
+            "DROP(1); \n"
+            "MOV(INDD(R0, 0), IMM(T_CLOSURE)); \n"
+            "MOV(INDD(R0, 1), IMM(12345678)); \n"
+            "MOV(INDD(R0, 2), LABEL(L_vector_length_Body)); \n"
+            "MOV(IND(" (number->string (fvar_get_address_by_name 'vector-length global_var_table)) "), R0);\n")))
