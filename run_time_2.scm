@@ -76,7 +76,7 @@
             "MOV(INDD(R0, 0), IMM(T_CLOSURE)); \n"
             "MOV(INDD(R0, 1), IMM(12345678)); \n"
             "MOV(INDD(R0, 2), LABEL(L_eq_body)); \n"
-            "MOV(IND(" (number->string (fvar_get_address_by_name 'simbol->string global_var_table)) "), R0);\n")))
+            "MOV(IND(" (number->string (fvar_get_address_by_name 'eq global_var_table)) "), R0);\n")))
 
 
 (define asm_string->symbol
@@ -95,7 +95,7 @@
             "CMP (INDD(R4, 1), 0);\n"
             "JUMP_EQ (L_clos_string_symbol_not_found);\n"
             "MOV (R4, INDD(R4, 1));\n"
-
+            "JUMP (L_string_symbol_search_loop);\n"
             ;handle results:
             "L_clos_string_symbol_not_found:\n"
             "PUSH (2);\n"                       ;for new string_link
@@ -103,7 +103,7 @@
             "DROP (1);\n"
             "MOV (IND(R0), R3);\n"
             "MOV (INDD (R0, 1), 0);\n"
-            "MOV (INDD(R4, 1), 0);\n"           ;last link is no last anymore
+            "MOV (INDD(R4, 1), R0);\n"           ;last link is no last anymore
             ;continue to make symbol
 
             "L_clos_string_symbol_found:\n"
@@ -123,5 +123,5 @@
             "MOV(INDD(R0, 0), IMM(T_CLOSURE)); \n"
             "MOV(INDD(R0, 1), IMM(12345678)); \n"
             "MOV(INDD(R0, 2), LABEL(L_string_symbol_body)); \n"
-            "MOV(IND(" (number->string (fvar_get_address_by_name 'simbol->string global_var_table)) "), R0);\n")))
+            "MOV(IND(" (number->string (fvar_get_address_by_name 'string->symbol global_var_table)) "), R0);\n")))
 
