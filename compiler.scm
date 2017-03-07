@@ -1077,7 +1077,6 @@ return 0;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (define string_table_start_add -1)
-(define string_table_last_add -1)
 
 (define build_initial_table_list_string
     (lambda (const_tab next_available)
@@ -1099,7 +1098,6 @@ return 0;
                  (val (car element))
                  (add (cadr element))
                  (next 0))
-                (set! string_table_last_add add)
                (list `(,val ,add ,next))))
           (else (let* ((next_element (cadr lst))
                       (next_element_add (cadr next_element)))
