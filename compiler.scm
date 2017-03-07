@@ -1,8 +1,9 @@
 (load "compiler_hw3.scm")
 (load "run_time.scm")
+(load "run_time_2.scm")
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;CODE-GEN;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;THE-CODE-GEN;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (define count 0)
@@ -38,6 +39,8 @@
               ((equal? pe 'null?) (asm_null? global_tab))
               ((equal? pe 'string-length) (asm_string_length global_tab))
               ((equal? pe 'vector-length) (asm_vector_length global_tab))
+              ((equal? pe 'symbol->string) (asm_symbol->string global_tab))
+              ((equal? pe 'eq?) (asm_eq? global_tab))
               ((pair? pe)
                ;TODO:,box
                (cond ((equal? (car pe) 'if3) (code-gen-if3 pe major const_tab global_tab))
@@ -661,8 +664,8 @@
                                                                                   list_table_of_rep_string 
                                                                                   asm_instructions_string))
                (final_asm (add_prologue_epilgue asm_with_const_global_string_table)))
-   (string->file final_asm asm_target_file))))
-;super_parsed_list)))
+ (string->file final_asm asm_target_file))))
+;list_table_of_rep_string)))
 
 (define build_asm_insts_list
     (lambda (super_parsed_list const_tab global_tab)
@@ -677,11 +680,12 @@
             ""
             (string-append (car insts_list) (build_asm_insts_string (cdr insts_list))))))
 
+;TODO: CHANGE STRING TABLE
 (define add_const_global_string_table 
     (lambda (constant_table global_var_table string_table asm_instructions_string)
         (string-append (build_asm_constant_table constant_table)
                        (build_asm_global_table global_var_table (find_next_available_address constant_table))
-                       ;(build_asm_string_table string_table (find_next_available_address_after_global global_var_table constant_table))
+                       (build_asm_string_table string_table (find_next_available_address_after_global global_var_table constant_table))
                         asm_instructions_string)))
 
 (define parsed_and_hw3 
@@ -1072,15 +1076,35 @@ return 0;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;REP-STRING-LIST;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
+(define string_table_start_add -1)
+(define string_table_last_add -1)
+
 (define build_initial_table_list_string
     (lambda (const_tab next_available)
         (let ((string_list (build_initial_list_string const_tab)))
             (letrec ((run (lambda (lst next_add)
                             (if (null? lst)
                                 lst
-                                (cons `(,(car lst) ,next_add)
-                                       (run (cdr lst) (+ next_add 1)))))))
-                (run string_list next_available)))))
+                                (cons (list (car lst) next_add)
+                                       (run (cdr lst) (+ next_add 2)))))))
+                (set! string_table_start_add next_available)
+                (update_with_correct_adds 
+                  (run string_list next_available))))))
+
+(define update_with_correct_adds
+  (lambda (lst)
+    (cond ((null? lst) lst)
+          ((= (length lst) 1) 
+            (let* ((element (car lst))
+                 (val (car element))
+                 (add (cadr element))
+                 (next 0))
+                (set! string_table_last_add add)
+               (list `(,val ,add ,next))))
+          (else (let* ((next_element (cadr lst))
+                      (next_element_add (cadr next_element)))
+             `( ,(append (car lst) (list next_element_add))
+                     ,@(update_with_correct_adds (cdr lst))))))))
 
 (define build_initial_list_string
     (lambda (const_tab)
@@ -1100,7 +1124,7 @@ return 0;
             "\n\n//----------STRING-TABLE----------//\n\n"
             (let* ((last_element (car (reverse string_table)))
                    (address (cadr last_element))
-                   (malloc_need (- (+ address 1) start_address))
+                   (malloc_need (- (+ address 2) start_address))
                    (malloc_need_str (number->string malloc_need)))
                 (string-append 
                     "\n\n//----------STRING-TABLE----------//\n\n"
@@ -1111,10 +1135,12 @@ return 0;
                                         (if (null? lst)
                                             ""  
                                              (let* ((element (car lst))
-                                                    (address (cadr element))
-                                                    (string_add (car element)))
+                                                   (address (cadr element))
+                                                    (string_add (car element))
+                                                    (next_element_add (caddr element)))
                                              
                                                 (string-append "MOV (IND("(number->string address)"), "(number->string string_add)");\n"
+                                                               "MOV (IND("(number->string (+ 1 address))"), "(number->string next_element_add)");\n"
                                                                (run (cdr lst))))))))
                         (run string_table)))
                     
