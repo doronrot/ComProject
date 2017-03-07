@@ -41,6 +41,7 @@
               ((equal? pe 'vector-length) (asm_vector_length global_tab))
               ((equal? pe 'symbol->string) (asm_symbol->string global_tab))
               ((equal? pe 'eq?) (asm_eq? global_tab))
+              ((equal? pe 'string->symbol) (asm_string->symbol global_tab))
               ((pair? pe)
                ;TODO:,box
                (cond ((equal? (car pe) 'if3) (code-gen-if3 pe major const_tab global_tab))
