@@ -640,7 +640,9 @@
     (lambda (scm_src_file asm_target_file)
         (let* ((scm_content (file->string scm_src_file))
                (match_and_remain (test-string <Sexpr> scm_content))
-               (sexprs_list (create_sexprs_list scm_content))
+               (sexprs_list (create_sexprs_list (string-append "(begin " 
+                                                                scm_content
+                                                                ")")))
                (super_parsed_list (parsed_and_hw3 sexprs_list))
                (constant_table (build_constant_table super_parsed_list))
                (global_var_table (build_global_var_table super_parsed_list (find_next_available_address constant_table)))
@@ -656,8 +658,8 @@
                                                                                   list_table_of_rep_string 
                                                                                   asm_instructions_string))
                (final_asm (add_prologue_epilgue asm_with_const_global_string_table)))
-    (string->file final_asm asm_target_file))))
-;list_table_of_rep_string)))
+   (string->file final_asm asm_target_file))))
+;super_parsed_list)))
 
 (define build_asm_insts_list
     (lambda (super_parsed_list const_tab global_tab)
