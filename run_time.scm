@@ -340,7 +340,7 @@
             "MOV(FP, SP); \n"
             "CMP(FPARG(1), IMM(1)); \n"
             "JUMP_NE(LZero_End);\n"   ;incorr args num
-            "CMP(INDD(R1, 1), IMM(0)); \n"
+            "CMP(INDD(FPARG(2), 1), IMM(0)); \n"
             "JUMP_EQ(LZero); \n"
             "MOV(R0,SOB_FALSE); \n"     ;else
             "JUMP(LZero_End); \n"
@@ -1080,8 +1080,7 @@
             " MOV(FP, SP); \n"
             " CMP(FPARG(1),IMM(1));\n"
             " JUMP_NE(L_not_incorrect_args_num);\n"
-            " MOV(R2,IND(FPARG(2)));\n"     ;some_sob
-            " PUSH(R2);\n"
+            " PUSH(FPARG(2));\n"
             " CALL(IS_SOB_BOOL);\n"
             " DROP(1);\n"
             " CMP(R0,IMM(1));\n"         ;bool?
