@@ -49,6 +49,13 @@
               ((equal? pe 'string-set!) (asm_string_set global_tab))
               ((equal? pe 'vector-set!) (asm_vector_set global_tab))
 
+              ((equal? pe 'integer->char) (asm_integer_to_char global_tab))
+              ((equal? pe 'char->integer) (asm_char_to_integer global_tab))
+              ((equal? pe 'not) (asm_not global_tab))
+              ((equal? pe 'list) (asm_list global_tab))
+              ((equal? pe 'numerator) (asm_numerator global_tab))
+              ((equal? pe 'denominator) (asm_denominator global_tab))
+
               ((pair? pe)
                ;TODO:,box
                (cond ((equal? (car pe) 'if3) (code-gen-if3 pe major const_tab global_tab))
