@@ -360,40 +360,6 @@
             "MOV(IND(" (number->string (fvar_get_address_by_name 'zero? global_var_table)) "), R0);\n")))
     
 
-
-;TODO well syntaxed??
-; make a cunk of scheme specials
-; (define asm_not
-;   (lambda (global_var_table)
-;     (string-append
-;         "JUMP(LmakeNotClos); \n"
-;         "LNotBody: \n"
-;             (code-gen pe major const_tab)
-;             "PUSH(FP); \n"
-;             "MOV(FP, SP); \n"
-;             "CMP(R0,SOB_FALSE); \n"
-;             "JUMP_EQ(LNot_retTrue); \n"
-;             "MOV(R0,SOB_FALSE); \n"     ;else
-;             "JUMP(LNot_End); \n"
-;         "LNot_retTrue: \n"
-;             "MOV(R0,SOB_TRUE);\n"
-;         "LNot_End: \n"
-;             "POP(FP); \n"
-;             "RETURN; \n \n"
-        
-;         "LmakeNotClos: \n"
-;             "PUSH(IMM(3)); \n"
-;             "CALL(MALLOC); \n"
-;             "DROP(1); \n"
-;             "MOV(INDD(R0, 0), IMM(T_CLOSURE)); \n"
-;             "MOV(INDD(R0, 1), IMM(12345678)); \n"
-;             "MOV(INDD(R0, 2), LABEL(LNotBody)); \n"
-;             "MOV(IND(" (number->string (fvar_get_address_by_name 'not global_var_table)) "), R0);\n")))
-    
-; (define asm_functions
-;     not)
-
-
 (define asm_boolean?
   (lambda (global_var_table)
     (string-append
@@ -1044,6 +1010,245 @@
             "MOV(INDD(R0, 1), IMM(12345678)); \n"
             "MOV(INDD(R0, 2), LABEL(L_vector_set_Body)); \n"
             "MOV(IND(" (number->string (fvar_get_address_by_name 'vector-set! global_var_table)) "), R0);\n")))
+
+(define asm_integer_to_char
+  (lambda (global_var_table)
+    (string-append
+        " JUMP(Lmake_integer_to_char_Clos); \n"
+        "L_integer_to_char_Body: \n"
+            " PUSH(FP); \n"
+            " MOV(FP, SP); \n"
+            " CMP(FPARG(1), IMM(1)); \n"
+            " JUMP_NE(L_integer_to_char_End);\n"     ;incorr args num
+            " MOV(R2,FPARG(2));\n"       ;R2<-sob_integer
+            " CMP(IND(R2),T_INTEGER);\n"
+            " JUMP_NE(L_integer_to_char_End);\n"    ;type not an integer
+            " MOV(R3,INDD(R2,1));\n"  ;R3<-int
+            " PUSH(R3);\n"
+            " CALL(MAKE_SOB_CHAR);\n"
+            " DROP(1);\n"
+        "L_integer_to_char_End: \n"
+            " POP(FP); \n"
+            " RETURN; \n\n"
+
+        "Lmake_integer_to_char_Clos: \n"
+            "PUSH(IMM(3)); \n"
+            "CALL(MALLOC); \n"
+            "DROP(1); \n"
+            "MOV(INDD(R0, 0), IMM(T_CLOSURE)); \n"
+            "MOV(INDD(R0, 1), IMM(12345678)); \n"
+            "MOV(INDD(R0, 2), LABEL(L_integer_to_char_Body)); \n"
+            "MOV(IND(" (number->string (fvar_get_address_by_name 'integer->char global_var_table)) "), R0);\n")))
+
+
+(define asm_char_to_integer
+  (lambda (global_var_table)
+    (string-append
+        " JUMP(Lmake_char_to_integer_Clos); \n"
+        "L_char_to_integer_Body: \n"
+            " PUSH(FP); \n"
+            " MOV(FP, SP); \n"
+            " CMP(FPARG(1), IMM(1)); \n"
+            " JUMP_NE(L_char_to_integer_End);\n"     ;incorr args num
+            " MOV(R2,FPARG(2));\n"       ;R2<-sob_char
+            " CMP(IND(R2),T_CHAR);\n"
+            " JUMP_NE(L_char_to_integer_End);\n"    ;type not an char
+            " MOV(R3,INDD(R2,1));\n"  ;R3<-char
+            " PUSH(R3);\n"
+            " CALL(MAKE_SOB_INTEGER);\n"
+            " DROP(1);\n"
+        "L_char_to_integer_End: \n"
+            " POP(FP); \n"
+            " RETURN; \n\n"
+
+        "Lmake_char_to_integer_Clos: \n"
+            "PUSH(IMM(3)); \n"
+            "CALL(MALLOC); \n"
+            "DROP(1); \n"
+            "MOV(INDD(R0, 0), IMM(T_CLOSURE)); \n"
+            "MOV(INDD(R0, 1), IMM(12345678)); \n"
+            "MOV(INDD(R0, 2), LABEL(L_char_to_integer_Body)); \n"
+            "MOV(IND(" (number->string (fvar_get_address_by_name 'char->integer global_var_table)) "), R0);\n")))
+
+    
+(define asm_not
+  (lambda (global_var_table)
+    (string-append
+        "JUMP(LmakeNotClos); \n"
+        "LNotBody: \n"
+            " PUSH(FP); \n"
+            " MOV(FP, SP); \n"
+            " CMP(FPARG(1),IMM(1));\n"
+            " JUMP_NE(L_not_incorrect_args_num);\n"
+            " MOV(R2,IND(FPARG(2)));\n"     ;some_sob
+            " PUSH(R2);\n"
+            " CALL(IS_SOB_BOOL);\n"
+            " DROP(1);\n"
+            " CMP(R0,IMM(1));\n"         ;bool?
+            " JUMP_NE(LNot_retFalse);\n"    ;not bool -> ret #f
+            " MOV(R3,INDD(FPARG(2),1));\n"
+            " CMP(R3,IMM(1));\n"          ;true?
+            " JUMP_EQ(LNot_retFalse);\n"
+            " MOV(R0,SOB_TRUE); \n"     ;else
+            " JUMP(LNot_End); \n"
+        "LNot_retFalse: \n"
+            " MOV(R0,SOB_FALSE);\n"
+        "L_not_incorrect_args_num:\n"
+        "LNot_End: \n"
+            " POP(FP); \n"
+            " RETURN; \n \n"
+        
+        "LmakeNotClos: \n"
+            "PUSH(IMM(3)); \n"
+            "CALL(MALLOC); \n"
+            "DROP(1); \n"
+            "MOV(INDD(R0, 0), IMM(T_CLOSURE)); \n"
+            "MOV(INDD(R0, 1), IMM(12345678)); \n"
+            "MOV(INDD(R0, 2), LABEL(LNotBody)); \n"
+            "MOV(IND(" (number->string (fvar_get_address_by_name 'not global_var_table)) "), R0);\n")))
+    
+
+(define asm_list
+  (lambda (global_var_table)
+    (string-append
+        "JUMP(LmakelistClos); \n"
+        "LlistBody: \n"
+            " PUSH(FP); \n"
+            " MOV(FP, SP); \n"
+            " MOV(R1,FPARG(1));\n"  ;list length
+            " CMP(R1,IMM(0));\n"     ;empty list
+            " JUMP_EQ(L_Empty_list);\n"
+            " MOV(R2,R1);\n"
+            " MUL(R2,3);\n"     ;size to malloc
+            " PUSH(R2);\n"
+            " CALL(MALLOC);\n"
+            " DROP(1);\n"
+            " MOV(IND(R0),IMM(T_PAIR));\n"
+            " MOV(INDD(R0,1),FPARG(2+R1-1));\n"     ;last pair's car
+            " MOV(INDD(R0,2),IMM(SOB_NIL));\n"     ;last pair's cdr -> nil
+            " MOV(R3,IMM(1));\n"     ;counter
+            " MOV(R5,R0);\n"        ;save list start at R0
+        "L_list_Loop: \n"
+            " CMP(R3,R1);\n"
+            " JUMP_EQ(Llist_ret_list_start);\n"
+            " INCR(R3);\n"
+            " MOV(R4,R5);\n"        ;save prev pair
+            " ADD(R5,3);\n"         ;move to next pair
+            " MOV(R6,R1);\n"
+            " SUB(R6,R3);\n"
+            " MOV(IND(R5),IMM(T_PAIR));\n"
+            " MOV(INDD(R5,1),FPARG(2+R6));\n"     ;pair's car
+            " MOV(INDD(R5,2),R4);\n"     ;pair's cdr -> prev pair
+            " JUMP(L_list_Loop);\n"
+        "L_Empty_list: \n"
+            " PUSH(IMM(1));\n"
+            " CALL(MALLOC);\n"
+            " DROP(1);\n"
+            " MOV(R0,IMM(SOB_NIL));\n"
+            " JUMP(Llist_End);\n"
+        "Llist_ret_list_start: \n"
+            " MOV(R0,R5);\n"        ;point to the list's start (the first pair)
+        "Llist_End: \n"
+            " POP(FP); \n"
+            " RETURN; \n \n"
+        
+        "LmakelistClos: \n"
+            "PUSH(IMM(3)); \n"
+            "CALL(MALLOC); \n"
+            "DROP(1); \n"
+            "MOV(INDD(R0, 0), IMM(T_CLOSURE)); \n"
+            "MOV(INDD(R0, 1), IMM(12345678)); \n"
+            "MOV(INDD(R0, 2), LABEL(LlistBody)); \n"
+            "MOV(IND(" (number->string (fvar_get_address_by_name 'list global_var_table)) "), R0);\n")))
+ 
+
+(define asm_numerator   ;mone
+  (lambda (global_var_table)
+    (string-append
+        "JUMP(Lmake_Numerator_Clos); \n"
+        "L_Numerator_Body: \n"
+            " PUSH(FP); \n"
+            " MOV(FP, SP); \n"
+            " MOV(R1,FPARG(1));\n"
+            " CMP(R1,IMM(1));\n"
+            " JUMP_NE(L_Numerator_End);\n"  ;incorrect args num
+            " MOV(R2,FPARG(2));\n"      ;R2<-fract?
+            " PUSH(R2);\n"
+            " CALL(IS_SOB_FRACTION);\n"
+            " DROP(1);\n"
+            " CMP(R0,IMM(1));\n"
+            " JUMP_NE(L_Numerator_integer);\n"
+
+            " MOV(R0,INDD(R2,1));\n"        ;R0<-numerator
+            " PUSH(R0);\n"
+            " CALL(MAKE_SOB_INTEGER);\n"
+            " DROP(1);\n"
+            " JUMP (L_Numerator_End);\n"
+
+            " L_Numerator_integer:\n"
+            " PUSH(R2);\n"
+            " CALL(IS_SOB_INTEGER);\n"
+            " DROP(1);\n"
+            " CMP(R0,IMM(1));\n"
+            " JUMP_NE(L_Numerator_End);\n"
+            " MOV (R0, FPARG(2));\n"
+
+
+        "L_Numerator_End: \n"
+            " POP(FP); \n"
+            " RETURN; \n \n"
+        
+        "Lmake_Numerator_Clos: \n"
+            "PUSH(IMM(3)); \n"
+            "CALL(MALLOC); \n"
+            "DROP(1); \n"
+            "MOV(INDD(R0, 0), IMM(T_CLOSURE)); \n"
+            "MOV(INDD(R0, 1), IMM(12345678)); \n"
+            "MOV(INDD(R0, 2), LABEL(L_Numerator_Body)); \n"
+            "MOV(IND(" (number->string (fvar_get_address_by_name 'numerator global_var_table)) "), R0);\n")))
+
+(define asm_denominator
+  (lambda (global_var_table)
+    (string-append
+        "JUMP(Lmake_denominator_Clos); \n"
+        "L_denominator_Body: \n"
+            " PUSH(FP); \n"
+            " MOV(FP, SP); \n"
+            " MOV(R1,FPARG(1));\n"
+            " CMP(R1,IMM(1));\n"
+            " JUMP_NE(L_denominator_End);\n"  ;incorrect args num
+            " MOV(R2,FPARG(2));\n"      ;R2<-fract?
+            " PUSH(R2);\n"
+            " CALL(IS_SOB_FRACTION);\n"
+            " DROP(1);\n"
+            " CMP(R0,IMM(1));\n"
+            " JUMP_NE(L_denominator_integer);\n"
+
+            " MOV(R0,INDD(R2,2));\n"        ;R0<-denominator
+            " PUSH(R0);\n"
+            " CALL(MAKE_SOB_INTEGER);\n"
+            " DROP(1);\n"
+            " JUMP(L_denominator_End);\n"
+
+            " L_denominator_integer: \n"
+            " MOV(R0,IMM(1));\n"        ;R0<-numerator
+            " PUSH(R0);\n"
+            " CALL(MAKE_SOB_INTEGER);\n"
+            " DROP(1);\n"
+
+        "L_denominator_End: \n"
+            " POP(FP); \n"
+            " RETURN; \n \n"
+        
+        "Lmake_denominator_Clos: \n"
+            "PUSH(IMM(3)); \n"
+            "CALL(MALLOC); \n"
+            "DROP(1); \n"
+            "MOV(INDD(R0, 0), IMM(T_CLOSURE)); \n"
+            "MOV(INDD(R0, 1), IMM(12345678)); \n"
+            "MOV(INDD(R0, 2), LABEL(L_denominator_Body)); \n"
+            "MOV(IND(" (number->string (fvar_get_address_by_name 'denominator global_var_table)) "), R0);\n")))
+
 
 
 (define asm_symbol->string
