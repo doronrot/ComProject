@@ -1,6 +1,5 @@
 (load "compiler_hw3.scm")
 (load "run_time.scm")
-(load "run_time_2.scm")
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;THE-CODE-GEN;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -41,7 +40,15 @@
               ((equal? pe 'vector-length) (asm_vector_length global_tab))
               ((equal? pe 'symbol->string) (asm_symbol->string global_tab))
               ((equal? pe 'eq?) (asm_eq? global_tab))
-              ((equal? pe 'string->symbol) (asm_string->symbol global_tab))
+
+              ((equal? pe 'string-ref) (asm_string_ref global_tab))
+              ((equal? pe 'vector-ref) (asm_vector_ref global_tab))
+              ((equal? pe 'make-string) (asm_make_string global_tab))
+              ((equal? pe 'make-vector) (asm_make_vector global_tab))
+              ((equal? pe 'vector) (asm_vector global_tab))
+              ((equal? pe 'string-set!) (asm_string_set global_tab))
+              ((equal? pe 'vector-set!) (asm_vector_set global_tab))
+
               ((pair? pe)
                ;TODO:,box
                (cond ((equal? (car pe) 'if3) (code-gen-if3 pe major const_tab global_tab))
