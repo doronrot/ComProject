@@ -912,7 +912,7 @@ return 0;
         (cond ((and (number? element) (integer? element))
                `(,next_available ,element (T_INTEGER ,element)))
               ((and (number? element) (not (integer? element)))
-               `(,next_available ,element (T_FRACTION ,element))) ;todo: change
+               `(,next_available ,element (T_FRACTION ,(numerator element) ,(denominator element))))
               ((char? element)
                 `(,next_available ,element (T_CHAR ,element)))
               ((string? element)
